@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Friettent Roostermaker</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>🍟 Friettent Roostermaker</h1>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="medewerkers">Medewerkers</button>
+    <button class="tab-btn" data-tab="bezetting">Bezetting</button>
+    <button class="tab-btn" data-tab="rooster">Rooster</button>
+  </nav>
+</header>
+
+<main>
+  <!-- MEDEWERKERS TAB -->
+  <section id="tab-medewerkers" class="tab-content active">
+    <div class="panel">
+      <h2 id="employee-form-title">Nieuwe medewerker</h2>
+      <form id="employee-form">
+        <input type="hidden" id="employee-id">
+        <label>
+          Naam
+          <input type="text" id="employee-naam" required placeholder="Bijv. Jan">
+        </label>
+
+        <fieldset>
+          <legend>Takenpakket</legend>
+          <div id="employee-taken" class="checkbox-grid"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Vaste werkdagen</legend>
+          <div id="employee-dagen" class="checkbox-grid"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Verlof aangevraagd (specifieke data)</legend>
+          <div class="verlof-input-row">
+            <input type="date" id="employee-verlof-datum">
+            <button type="button" id="add-verlof-btn" class="btn-secondary">+ Toevoegen</button>
+          </div>
+          <ul id="employee-verlof-list" class="verlof-list"></ul>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Opslaan</button>
+          <button type="button" id="employee-cancel-btn" class="btn-secondary" hidden>Annuleren</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Medewerkers overzicht</h2>
+        <div class="io-buttons">
+          <button id="export-btn" class="btn-secondary">Exporteer JSON</button>
+          <label class="btn-secondary file-label">
+            Importeer JSON
+            <input type="file" id="import-input" accept="application/json" hidden>
+          </label>
+        </div>
+      </div>
+      <table id="employee-table">
+        <thead>
+          <tr>
+            <th>Naam</th>
+            <th>Takenpakket</th>
+            <th>Vaste dagen</th>
+            <th>Verlof</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="employee-tbody"></tbody>
+      </table>
+      <p id="employee-empty-msg" class="empty-msg" hidden>Nog geen medewerkers toegevoegd.</p>
+    </div>
+  </section>
+
+  <!-- BEZETTING TAB -->
+  <section id="tab-bezetting" class="tab-content">
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Benodigde bezetting per dag</h2>
+        <button id="reset-requirements-btn" class="btn-secondary">Herstel standaard</button>
+      </div>
+      <div class="table-scroll">
+        <table id="requirements-table">
+          <thead>
+            <tr>
+              <th>Taak</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="form-actions">
+        <button id="save-requirements-btn" class="btn-primary">Bezetting opslaan</button>
+        <span id="requirements-saved-msg" class="saved-msg" hidden>Opgeslagen ✓</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROOSTER TAB -->
+  <section id="tab-rooster" class="tab-content">
+    <div class="panel">
+      <h2>Rooster genereren</h2>
+      <div class="rooster-controls">
+        <label>
+          Week
+          <input type="week" id="week-picker">
+        </label>
+        <button id="generate-btn" class="btn-primary">Genereer rooster</button>
+      </div>
+      <div id="warnings-box" class="warnings-box" hidden></div>
+    </div>
+
+    <div class="panel">
+      <div class="table-scroll">
+        <table id="schedule-table"></table>
+      </div>
+      <p id="schedule-empty-msg" class="empty-msg">Nog geen rooster gegenereerd voor deze week.</p>
+    </div>
+  </section>
+</main>
+
+<script src="js/app.js"></script>
+</body>
+</html>
