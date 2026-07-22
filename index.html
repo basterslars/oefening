@@ -156,6 +156,52 @@ legend {
 
 .checkbox-grid input { margin: 0; width: auto; }
 
+.fieldset-hint {
+  margin: 0 0 0.7rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.dagen-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.dag-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  min-width: 110px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.dag-checkbox-label input { margin: 0; width: auto; }
+
+.dienst-select {
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  max-width: 160px;
+}
+
+.dienst-select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .verlof-input-row {
   display: flex;
   gap: 0.5rem;
@@ -324,6 +370,11 @@ th { color: var(--muted); font-weight: 600; }
   border-style: dashed;
 }
 
+#schedule-table select.avondspits {
+  border-style: dotted;
+  color: var(--accent-dark);
+}
+
 #schedule-table td.understaffed {
   background: var(--danger-bg);
 }
@@ -362,7 +413,8 @@ th { color: var(--muted); font-weight: 600; }
 
         <fieldset>
           <legend>Vaste werkdagen</legend>
-          <div id="employee-dagen" class="checkbox-grid"></div>
+          <p class="fieldset-hint">Vink de dagen aan waarop iemand werkt, en geef per dag aan of dat de hele dag is of alleen de avondspits.</p>
+          <div id="employee-dagen" class="dagen-list"></div>
         </fieldset>
 
         <fieldset>
@@ -507,10 +559,20 @@ th { color: var(--muted); font-weight: 600; }
 
   // ---------- Storage helpers ----------
 
+  function normalizeEmployee(emp) {
+    const vasteDagen = Array.isArray(emp.vasteDagen) ? emp.vasteDagen : [];
+    const dienstType = {};
+    vasteDagen.forEach((d) => {
+      dienstType[d] = emp.dienstType && emp.dienstType[d] === "avondspits" ? "avondspits" : "heledag";
+    });
+    return Object.assign({}, emp, { vasteDagen, dienstType });
+  }
+
   function loadEmployees() {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.employees);
-      return raw ? JSON.parse(raw) : [];
+      const list = raw ? JSON.parse(raw) : [];
+      return list.map(normalizeEmployee);
     } catch (e) {
       return [];
     }
@@ -582,8 +644,39 @@ th { color: var(--muted); font-weight: 600; }
     });
   }
 
+  function buildDagenRows(container, items) {
+    container.innerHTML = "";
+    items.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "dag-row";
+      row.dataset.day = item.key;
+
+      const label = document.createElement("label");
+      label.className = "dag-checkbox-label";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "dagen";
+      checkbox.value = item.key;
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(item.label));
+
+      const select = document.createElement("select");
+      select.className = "dienst-select";
+      select.disabled = true;
+      select.innerHTML = '<option value="heledag">Hele dag</option><option value="avondspits">Avondspits</option>';
+
+      checkbox.addEventListener("change", () => {
+        select.disabled = !checkbox.checked;
+      });
+
+      row.appendChild(label);
+      row.appendChild(select);
+      container.appendChild(row);
+    });
+  }
+
   buildCheckboxGrid(document.getElementById("employee-taken"), TASKS, "taken");
-  buildCheckboxGrid(document.getElementById("employee-dagen"), DAYS, "dagen");
+  buildDagenRows(document.getElementById("employee-dagen"), DAYS);
 
   function getCheckedValues(name) {
     return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((el) => el.value);
@@ -591,6 +684,33 @@ th { color: var(--muted); font-weight: 600; }
   function setCheckedValues(name, values) {
     document.querySelectorAll(`input[name="${name}"]`).forEach((el) => {
       el.checked = values.includes(el.value);
+    });
+  }
+
+  function getVasteDagenData() {
+    const vasteDagen = [];
+    const dienstType = {};
+    document.querySelectorAll("#employee-dagen .dag-row").forEach((row) => {
+      const day = row.dataset.day;
+      const checkbox = row.querySelector('input[name="dagen"]');
+      const select = row.querySelector(".dienst-select");
+      if (checkbox.checked) {
+        vasteDagen.push(day);
+        dienstType[day] = select.value;
+      }
+    });
+    return { vasteDagen, dienstType };
+  }
+
+  function setVasteDagenData(vasteDagen, dienstType) {
+    document.querySelectorAll("#employee-dagen .dag-row").forEach((row) => {
+      const day = row.dataset.day;
+      const checkbox = row.querySelector('input[name="dagen"]');
+      const select = row.querySelector(".dienst-select");
+      const checked = vasteDagen.includes(day);
+      checkbox.checked = checked;
+      select.disabled = !checked;
+      select.value = (dienstType && dienstType[day]) || "heledag";
     });
   }
 
@@ -634,7 +754,7 @@ th { color: var(--muted); font-weight: 600; }
     employeeFormVerlof = [];
     document.getElementById("employee-form").reset();
     setCheckedValues("taken", []);
-    setCheckedValues("dagen", []);
+    setVasteDagenData([], {});
     renderVerlofList();
     document.getElementById("employee-form-title").textContent = "Nieuwe medewerker";
     document.getElementById("employee-cancel-btn").hidden = true;
@@ -645,13 +765,14 @@ th { color: var(--muted); font-weight: 600; }
     const naam = document.getElementById("employee-naam").value.trim();
     if (!naam) return;
     const taken = getCheckedValues("taken");
-    const vasteDagen = getCheckedValues("dagen");
+    const { vasteDagen, dienstType } = getVasteDagenData();
 
     if (editingEmployeeId) {
       const emp = employees.find((e) => e.id === editingEmployeeId);
       emp.naam = naam;
       emp.taken = taken;
       emp.vasteDagen = vasteDagen;
+      emp.dienstType = dienstType;
       emp.verlof = employeeFormVerlof.slice();
     } else {
       employees.push({
@@ -659,6 +780,7 @@ th { color: var(--muted); font-weight: 600; }
         naam,
         taken,
         vasteDagen,
+        dienstType,
         verlof: employeeFormVerlof.slice(),
       });
     }
@@ -676,7 +798,7 @@ th { color: var(--muted); font-weight: 600; }
     employeeFormVerlof = emp.verlof.slice();
     document.getElementById("employee-naam").value = emp.naam;
     setCheckedValues("taken", emp.taken);
-    setCheckedValues("dagen", emp.vasteDagen);
+    setVasteDagenData(emp.vasteDagen, emp.dienstType);
     renderVerlofList();
     document.getElementById("employee-form-title").textContent = "Medewerker bewerken: " + emp.naam;
     document.getElementById("employee-cancel-btn").hidden = false;
@@ -715,7 +837,15 @@ th { color: var(--muted); font-weight: 600; }
         tr.appendChild(tdTaken);
 
         const tdDagen = document.createElement("td");
-        tdDagen.innerHTML = emp.vasteDagen.map((d) => `<span class="tag">${dayLabel(d)}</span>`).join("") || "—";
+        tdDagen.innerHTML =
+          emp.vasteDagen
+            .map(
+              (d) =>
+                `<span class="tag">${dayLabel(d)}${
+                  emp.dienstType && emp.dienstType[d] === "avondspits" ? " · avondspits" : ""
+                }</span>`
+            )
+            .join("") || "—";
         tr.appendChild(tdDagen);
 
         const tdVerlof = document.createElement("td");
@@ -760,7 +890,7 @@ th { color: var(--muted); font-weight: 600; }
       try {
         const data = JSON.parse(reader.result);
         if (Array.isArray(data.employees)) {
-          employees = data.employees;
+          employees = data.employees.map(normalizeEmployee);
           saveEmployees(employees);
         }
         if (data.requirements) {
@@ -959,7 +1089,9 @@ th { color: var(--muted); font-weight: 600; }
           html += `<option value="" class="slot-empty-option">— leeg —</option>`;
           employeesForTask(task.key).forEach((emp) => {
             const selected = emp.id === currentId ? "selected" : "";
-            html += `<option value="${emp.id}" ${selected}>${emp.naam}</option>`;
+            const isAvondspits = emp.vasteDagen.includes(day.key) && emp.dienstType[day.key] === "avondspits";
+            const suffix = isAvondspits ? " (avondspits)" : "";
+            html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
           });
           html += `</select>`;
         }
@@ -979,12 +1111,16 @@ th { color: var(--muted); font-weight: 600; }
   function applySelectWarningClass(select) {
     const day = select.dataset.day;
     const empId = select.value;
-    select.classList.remove("not-fixed-day", "on-verlof");
+    select.classList.remove("not-fixed-day", "on-verlof", "avondspits");
     if (!empId) return;
     const emp = employees.find((e) => e.id === empId);
     if (!emp) return;
     const dayInfo = currentWeekDates.find((d) => d.key === day);
-    if (!emp.vasteDagen.includes(day)) select.classList.add("not-fixed-day");
+    if (!emp.vasteDagen.includes(day)) {
+      select.classList.add("not-fixed-day");
+    } else if (emp.dienstType[day] === "avondspits") {
+      select.classList.add("avondspits");
+    }
     if (dayInfo && emp.verlof.includes(dayInfo.dateIso)) select.classList.add("on-verlof");
   }
 
