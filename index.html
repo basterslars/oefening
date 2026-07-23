@@ -212,6 +212,30 @@ legend {
   cursor: not-allowed;
 }
 
+.contract-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 0.7rem;
+}
+.contract-checkbox-label input { margin: 0; width: auto; }
+
+.contract-fields {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.contract-fields label {
+  margin-bottom: 0;
+}
+
+.contract-fields input, .contract-fields select {
+  max-width: 160px;
+}
+
 .verlof-input-row {
   display: flex;
   gap: 0.5rem;
@@ -357,6 +381,9 @@ th { color: var(--muted); font-weight: 600; }
 
 .saved-msg { color: var(--ok); font-size: 0.88rem; }
 
+.saldo-tekort { color: var(--danger); font-weight: 600; }
+.saldo-overschot { color: var(--ok); }
+
 #requirements-table input[type="number"] {
   width: 70px;
   max-width: 70px;
@@ -445,6 +472,28 @@ th { color: var(--muted); font-weight: 600; }
         </fieldset>
 
         <fieldset>
+          <legend>Vast contract</legend>
+          <p class="fieldset-hint">Geef aan of deze medewerker een vast contract heeft en hoeveel uur dat is. Komt iemand een week/maand niet aan de contracturen, dan telt het tekort automatisch mee bij het genereren van de volgende periode.</p>
+          <label class="contract-checkbox-label">
+            <input type="checkbox" id="employee-contract-vast">
+            Heeft een vast contract
+          </label>
+          <div class="contract-fields">
+            <label>
+              Aantal uur
+              <input type="number" id="employee-contract-uren" min="0" step="0.5" disabled>
+            </label>
+            <label>
+              Periode
+              <select id="employee-contract-periode" disabled>
+                <option value="week">Per week</option>
+                <option value="maand">Per maand</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
           <legend>Verlof aangevraagd (specifieke data)</legend>
           <div class="verlof-input-row">
             <input type="date" id="employee-verlof-datum">
@@ -478,6 +527,7 @@ th { color: var(--muted); font-weight: 600; }
             <th>Takenpakket</th>
             <th>Vaste dagen</th>
             <th>Beschikbaar</th>
+            <th>Contract</th>
             <th>Verlof</th>
             <th></th>
           </tr>
@@ -490,6 +540,25 @@ th { color: var(--muted); font-weight: 600; }
 
   <!-- BEZETTING TAB -->
   <section id="tab-bezetting" class="tab-content">
+    <div class="panel">
+      <h2>Uren per dienst</h2>
+      <p class="fieldset-hint">Wordt gebruikt om contracturen te berekenen op basis van wie welke dienst (hele dag / avondspits) draait.</p>
+      <div class="contract-fields">
+        <label>
+          Uren per hele dag-dienst
+          <input type="number" id="uren-heledag" min="0" step="0.5">
+        </label>
+        <label>
+          Uren per avondspits-dienst
+          <input type="number" id="uren-avondspits" min="0" step="0.5">
+        </label>
+      </div>
+      <div class="form-actions">
+        <button id="save-shift-hours-btn" class="btn-primary">Opslaan</button>
+        <span id="shift-hours-saved-msg" class="saved-msg" hidden>Opgeslagen ✓</span>
+      </div>
+    </div>
+
     <div class="panel">
       <div class="panel-header">
         <h2>Benodigde bezetting per dag</h2>
@@ -524,6 +593,23 @@ th { color: var(--muted); font-weight: 600; }
         <button id="generate-btn" class="btn-primary">Genereer rooster</button>
       </div>
       <div id="warnings-box" class="warnings-box" hidden></div>
+    </div>
+
+    <div class="panel" id="contract-progress-panel" hidden>
+      <h2>Contracturen deze week</h2>
+      <div class="table-scroll">
+        <table id="contract-progress-table">
+          <thead>
+            <tr>
+              <th>Naam</th>
+              <th>Doel deze week</th>
+              <th>Gewerkt deze week</th>
+              <th>Saldo</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="panel">
@@ -574,7 +660,12 @@ th { color: var(--muted); font-weight: 600; }
     employees: "friettent_employees",
     requirements: "friettent_requirements",
     schedulePrefix: "friettent_schedule_",
+    shiftHours: "friettent_shift_hours",
   };
+
+  const DEFAULT_SHIFT_HOURS = { heledag: 8, avondspits: 4 };
+  const MIN_SHIFTS_PER_WEEK = 2;
+  const WEKEN_PER_MAAND = 52 / 12;
 
   function taskLabel(key) {
     const t = TASKS.find((t) => t.key === key);
@@ -606,11 +697,22 @@ th { color: var(--muted); font-weight: 600; }
         };
       });
     }
+    const contract = emp.contract && typeof emp.contract === "object" ? emp.contract : {};
     const clean = Object.assign({}, emp);
     delete clean.vasteDagen;
     delete clean.dienstType;
     clean.dagen = dagen;
+    clean.contract = {
+      vast: !!contract.vast,
+      uren: typeof contract.uren === "number" && contract.uren > 0 ? contract.uren : 0,
+      periode: contract.periode === "maand" ? "maand" : "week",
+    };
     return clean;
+  }
+
+  function weeklyTargetHoursFor(emp) {
+    if (!emp.contract || !emp.contract.vast || !emp.contract.uren) return null;
+    return emp.contract.periode === "maand" ? emp.contract.uren / WEKEN_PER_MAAND : emp.contract.uren;
   }
 
   function vasteDagenOf(emp) {
@@ -654,11 +756,38 @@ th { color: var(--muted); font-weight: 600; }
   function saveSchedule(weekValue, data) {
     localStorage.setItem(STORAGE_KEYS.schedulePrefix + weekValue, JSON.stringify(data));
   }
+  function loadShiftHours() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.shiftHours);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return {
+        heledag: typeof parsed.heledag === "number" ? parsed.heledag : DEFAULT_SHIFT_HOURS.heledag,
+        avondspits: typeof parsed.avondspits === "number" ? parsed.avondspits : DEFAULT_SHIFT_HOURS.avondspits,
+      };
+    } catch (e) {
+      return Object.assign({}, DEFAULT_SHIFT_HOURS);
+    }
+  }
+  function saveShiftHours(hours) {
+    localStorage.setItem(STORAGE_KEYS.shiftHours, JSON.stringify(hours));
+  }
+  function listStoredWeeksBefore(weekValue) {
+    const weeks = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.indexOf(STORAGE_KEYS.schedulePrefix) === 0) {
+        const w = key.slice(STORAGE_KEYS.schedulePrefix.length);
+        if (w < weekValue) weeks.push(w);
+      }
+    }
+    return weeks.sort();
+  }
 
   // ---------- App state ----------
 
   let employees = loadEmployees();
   let requirements = loadRequirements();
+  let shiftHours = loadShiftHours();
   let editingEmployeeId = null;
   let employeeFormVerlof = [];
   let currentWeekValue = null;
@@ -788,6 +917,34 @@ th { color: var(--muted); font-weight: 600; }
     });
   }
 
+  // ---------- Vast contract in het formulier ----------
+
+  const contractVastCheckbox = document.getElementById("employee-contract-vast");
+  const contractUrenInput = document.getElementById("employee-contract-uren");
+  const contractPeriodeSelect = document.getElementById("employee-contract-periode");
+
+  contractVastCheckbox.addEventListener("change", () => {
+    contractUrenInput.disabled = !contractVastCheckbox.checked;
+    contractPeriodeSelect.disabled = !contractVastCheckbox.checked;
+  });
+
+  function getContractData() {
+    return {
+      vast: contractVastCheckbox.checked,
+      uren: parseFloat(contractUrenInput.value) || 0,
+      periode: contractPeriodeSelect.value,
+    };
+  }
+
+  function setContractData(contract) {
+    const c = contract || { vast: false, uren: 0, periode: "week" };
+    contractVastCheckbox.checked = c.vast;
+    contractUrenInput.value = c.uren || "";
+    contractPeriodeSelect.value = c.periode || "week";
+    contractUrenInput.disabled = !c.vast;
+    contractPeriodeSelect.disabled = !c.vast;
+  }
+
   // ---------- Verlof list in the form ----------
 
   function renderVerlofList() {
@@ -829,6 +986,7 @@ th { color: var(--muted); font-weight: 600; }
     document.getElementById("employee-form").reset();
     setCheckedValues("taken", []);
     setDagenData({});
+    setContractData(null);
     renderVerlofList();
     document.getElementById("employee-form-title").textContent = "Nieuwe medewerker";
     document.getElementById("employee-cancel-btn").hidden = true;
@@ -840,12 +998,14 @@ th { color: var(--muted); font-weight: 600; }
     if (!naam) return;
     const taken = getCheckedValues("taken");
     const dagen = getDagenData();
+    const contract = getContractData();
 
     if (editingEmployeeId) {
       const emp = employees.find((e) => e.id === editingEmployeeId);
       emp.naam = naam;
       emp.taken = taken;
       emp.dagen = dagen;
+      emp.contract = contract;
       emp.verlof = employeeFormVerlof.slice();
     } else {
       employees.push({
@@ -853,6 +1013,7 @@ th { color: var(--muted); font-weight: 600; }
         naam,
         taken,
         dagen,
+        contract,
         verlof: employeeFormVerlof.slice(),
       });
     }
@@ -871,6 +1032,7 @@ th { color: var(--muted); font-weight: 600; }
     document.getElementById("employee-naam").value = emp.naam;
     setCheckedValues("taken", emp.taken);
     setDagenData(emp.dagen);
+    setContractData(emp.contract);
     renderVerlofList();
     document.getElementById("employee-form-title").textContent = "Medewerker bewerken: " + emp.naam;
     document.getElementById("employee-cancel-btn").hidden = false;
@@ -929,6 +1091,12 @@ th { color: var(--muted); font-weight: 600; }
             )
             .join("") || "—";
         tr.appendChild(tdBeschikbaar);
+
+        const tdContract = document.createElement("td");
+        tdContract.innerHTML = emp.contract && emp.contract.vast
+          ? `<span class="tag">Vast · ${emp.contract.uren}u per ${emp.contract.periode === "maand" ? "maand" : "week"}</span>`
+          : "—";
+        tr.appendChild(tdContract);
 
         const tdVerlof = document.createElement("td");
         tdVerlof.innerHTML = emp.verlof.slice().sort().map((v) => `<span class="tag">${v}</span>`).join("") || "—";
@@ -1043,6 +1211,23 @@ th { color: var(--muted); font-weight: 600; }
     renderRequirementsTable();
   });
 
+  // ---------- Uren per dienst ----------
+
+  function renderShiftHoursInputs() {
+    document.getElementById("uren-heledag").value = shiftHours.heledag;
+    document.getElementById("uren-avondspits").value = shiftHours.avondspits;
+  }
+
+  document.getElementById("save-shift-hours-btn").addEventListener("click", () => {
+    const heledag = parseFloat(document.getElementById("uren-heledag").value) || 0;
+    const avondspits = parseFloat(document.getElementById("uren-avondspits").value) || 0;
+    shiftHours = { heledag, avondspits };
+    saveShiftHours(shiftHours);
+    const msg = document.getElementById("shift-hours-saved-msg");
+    msg.hidden = false;
+    setTimeout(() => (msg.hidden = true), 2000);
+  });
+
   // ---------- Week helpers ----------
 
   function isoWeekStringFor(date) {
@@ -1073,11 +1258,59 @@ th { color: var(--muted); font-weight: 600; }
   const weekPicker = document.getElementById("week-picker");
   weekPicker.value = isoWeekStringFor(new Date());
 
+  // ---------- Contracturen ----------
+
+  function computeHoursForEmployeeInWeek(emp, scheduleData) {
+    let hours = 0;
+    const schedule = scheduleData.schedule;
+    Object.keys(schedule).forEach((dayKey) => {
+      Object.keys(schedule[dayKey]).forEach((task) => {
+        (schedule[dayKey][task] || []).forEach((id) => {
+          if (id !== emp.id) return;
+          const dagInfo = emp.dagen[dayKey];
+          const dienst = dagInfo ? dagInfo.dienst : "heledag";
+          hours += shiftHours[dienst] || 0;
+        });
+      });
+    });
+    return hours;
+  }
+
+  // Optelsom van (gewerkt - doel) over alle eerder gegenereerde weken, zodat een
+  // tekort of overschot automatisch meetelt bij het bepalen van de volgende periode.
+  function computeSaldoBeforeWeek(emp, weekValue) {
+    const target = weeklyTargetHoursFor(emp);
+    if (target === null) return 0;
+    let saldo = 0;
+    listStoredWeeksBefore(weekValue).forEach((w) => {
+      const data = loadSchedule(w);
+      if (!data) return;
+      saldo += computeHoursForEmployeeInWeek(emp, data) - target;
+    });
+    return saldo;
+  }
+
   // ---------- Schedule generation ----------
 
-  function generateSchedule(weekDates, reqs) {
+  function generateSchedule(weekDates, reqs, weekValue) {
     const shiftCount = {};
-    employees.forEach((e) => (shiftCount[e.id] = 0));
+    const hoursCount = {};
+    const saldoBefore = {};
+    const effectiveTargetHours = {};
+    employees.forEach((e) => {
+      shiftCount[e.id] = 0;
+      hoursCount[e.id] = 0;
+      saldoBefore[e.id] = computeSaldoBeforeWeek(e, weekValue);
+      const baseTarget = weeklyTargetHoursFor(e);
+      if (baseTarget === null) {
+        effectiveTargetHours[e.id] = null;
+      } else {
+        // Tekort van eerdere weken verhoogt dit weekdoel; overschot verlaagt het.
+        // Begrensd zodat een lang tekort niet in één week ingehaald hoeft te worden.
+        const adjusted = baseTarget - saldoBefore[e.id];
+        effectiveTargetHours[e.id] = Math.max(0, Math.min(adjusted, baseTarget * 2));
+      }
+    });
     const schedule = {};
     const warnings = [];
 
@@ -1107,21 +1340,37 @@ th { color: var(--muted); font-weight: 600; }
         return scarcityA - scarcityB;
       });
 
+      // Wie nog onder het minimum van 2 diensten zit, of wie (bij een vast contract) nog
+      // niet aan de (voor eerdere over/onderschotten gecorrigeerde) urennorm zit, krijgt
+      // voorrang boven mensen die al genoeg hebben. Binnen die groepen geldt eerlijke
+      // verdeling op basis van aantal diensten tot nu toe.
+      const needsMore = (e) => {
+        if (effectiveTargetHours[e.id] !== null) return hoursCount[e.id] < effectiveTargetHours[e.id];
+        return shiftCount[e.id] < MIN_SHIFTS_PER_WEEK;
+      };
+      const byPriority = (a, b) => {
+        const tierA = needsMore(a) ? 0 : 1;
+        const tierB = needsMore(b) ? 0 : 1;
+        if (tierA !== tierB) return tierA - tierB;
+        return shiftCount[a.id] - shiftCount[b.id] || a.naam.localeCompare(b.naam);
+      };
+
       taskEntries.forEach(([task, count]) => {
-        const byFairness = (a, b) => shiftCount[a.id] - shiftCount[b.id] || a.naam.localeCompare(b.naam);
         const notAssigned = (e) => !assignedToday.has(e.id);
 
-        const chosen = vastePool(task).filter(notAssigned).sort(byFairness).slice(0, count);
+        const chosen = vastePool(task).filter(notAssigned).sort(byPriority).slice(0, count);
         if (chosen.length < count) {
           const aanvulling = beschikbaarPool(task)
             .filter(notAssigned)
-            .sort(byFairness)
+            .sort(byPriority)
             .slice(0, count - chosen.length);
           chosen.push(...aanvulling);
         }
         chosen.forEach((e) => {
           assignedToday.add(e.id);
           shiftCount[e.id]++;
+          const dienst = e.dagen[day.key] ? e.dagen[day.key].dienst : "heledag";
+          hoursCount[e.id] += shiftHours[dienst] || 0;
         });
         const ids = chosen.map((e) => e.id);
         while (ids.length < count) ids.push(null);
@@ -1134,7 +1383,23 @@ th { color: var(--muted); font-weight: 600; }
       });
     });
 
-    return { schedule, warnings };
+    // Signaleer wie onder de 2 diensten blijft terwijl dat vermijdbaar leek.
+    employees.forEach((e) => {
+      if (shiftCount[e.id] >= MIN_SHIFTS_PER_WEEK) return;
+      const potentieleDagen = weekDates.filter(
+        (day) =>
+          e.dagen[day.key] &&
+          !e.verlof.includes(day.dateIso) &&
+          e.taken.some((t) => (reqs[day.key] || {})[t] > 0)
+      ).length;
+      if (potentieleDagen >= MIN_SHIFTS_PER_WEEK) {
+        warnings.push(
+          `${e.naam} heeft maar ${shiftCount[e.id]} dienst(en) deze week (streefdoel: minimaal ${MIN_SHIFTS_PER_WEEK}).`
+        );
+      }
+    });
+
+    return { schedule, warnings, hoursCount, effectiveTargetHours, saldoBefore };
   }
 
   // ---------- Schedule rendering ----------
@@ -1231,6 +1496,7 @@ th { color: var(--muted); font-weight: 600; }
     applySelectWarningClass(select);
     updateUnderstaffedHighlight();
     renderWarnings(computeWarningsFromCurrent());
+    renderContractProgress();
   }
 
   function updateUnderstaffedHighlight() {
@@ -1240,6 +1506,19 @@ th { color: var(--muted); font-weight: 600; }
       const ids = currentScheduleData.schedule[day][task] || [];
       td.classList.toggle("understaffed", ids.some((id) => !id));
     });
+  }
+
+  function computeShiftCountsFromSchedule(scheduleData) {
+    const counts = {};
+    employees.forEach((e) => (counts[e.id] = 0));
+    Object.keys(scheduleData.schedule).forEach((dayKey) => {
+      Object.keys(scheduleData.schedule[dayKey]).forEach((task) => {
+        (scheduleData.schedule[dayKey][task] || []).forEach((id) => {
+          if (id && counts[id] !== undefined) counts[id]++;
+        });
+      });
+    });
+    return counts;
   }
 
   function computeWarningsFromCurrent() {
@@ -1257,7 +1536,63 @@ th { color: var(--muted); font-weight: 600; }
         }
       });
     });
+
+    const shiftCounts = computeShiftCountsFromSchedule(currentScheduleData);
+    employees.forEach((e) => {
+      if (shiftCounts[e.id] >= MIN_SHIFTS_PER_WEEK) return;
+      const potentieleDagen = currentWeekDates.filter(
+        (day) =>
+          e.dagen[day.key] &&
+          !e.verlof.includes(day.dateIso) &&
+          e.taken.some((t) => (requirementsSnapshot[day.key] || {})[t] > 0)
+      ).length;
+      if (potentieleDagen >= MIN_SHIFTS_PER_WEEK) {
+        warnings.push(
+          `${e.naam} heeft maar ${shiftCounts[e.id]} dienst(en) deze week (streefdoel: minimaal ${MIN_SHIFTS_PER_WEEK}).`
+        );
+      }
+    });
+
     return warnings;
+  }
+
+  function renderContractProgress() {
+    const panel = document.getElementById("contract-progress-panel");
+    const tbody = document.querySelector("#contract-progress-table tbody");
+    if (!currentScheduleData || !currentWeekValue) {
+      panel.hidden = true;
+      return;
+    }
+    const contractEmployees = employees.filter((e) => weeklyTargetHoursFor(e) !== null);
+    if (!contractEmployees.length) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+    tbody.innerHTML = "";
+    contractEmployees
+      .slice()
+      .sort((a, b) => a.naam.localeCompare(b.naam))
+      .forEach((emp) => {
+        const baseTarget = weeklyTargetHoursFor(emp);
+        const saldoBefore = computeSaldoBeforeWeek(emp, currentWeekValue);
+        const effectiveTarget = Math.max(0, Math.min(baseTarget - saldoBefore, baseTarget * 2));
+        const actual = computeHoursForEmployeeInWeek(emp, currentScheduleData);
+        const saldoAfter = saldoBefore + (actual - baseTarget);
+        const saldoClass = saldoAfter < -0.05 ? "saldo-tekort" : saldoAfter > 0.05 ? "saldo-overschot" : "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${emp.naam}</td>
+          <td>${effectiveTarget.toFixed(1)}u${
+          Math.abs(saldoBefore) > 0.05
+            ? ` <small>(basis ${baseTarget.toFixed(1)}u, saldo daarvoor ${saldoBefore > 0 ? "+" : ""}${saldoBefore.toFixed(1)}u)</small>`
+            : ""
+        }</td>
+          <td>${actual.toFixed(1)}u</td>
+          <td class="${saldoClass}">${saldoAfter > 0 ? "+" : ""}${saldoAfter.toFixed(1)}u</td>
+        `;
+        tbody.appendChild(tr);
+      });
   }
 
   function renderWarnings(warnings) {
@@ -1279,11 +1614,12 @@ th { color: var(--muted); font-weight: 600; }
     currentWeekValue = weekValue;
     currentWeekDates = computeWeekDates(weekValue);
     const requirementsSnapshot = JSON.parse(JSON.stringify(requirements));
-    const { schedule, warnings } = generateSchedule(currentWeekDates, requirementsSnapshot);
+    const { schedule, warnings } = generateSchedule(currentWeekDates, requirementsSnapshot, weekValue);
     currentScheduleData = { schedule, requirementsSnapshot };
     saveSchedule(currentWeekValue, currentScheduleData);
     renderScheduleTable();
     renderWarnings(warnings);
+    renderContractProgress();
   });
 
   // Load a previously saved schedule for the currently selected week, if any.
@@ -1296,6 +1632,14 @@ th { color: var(--muted); font-weight: 600; }
       currentScheduleData = saved;
       renderScheduleTable();
       renderWarnings(computeWarningsFromCurrent());
+      renderContractProgress();
+    } else {
+      currentWeekValue = weekValue;
+      currentWeekDates = computeWeekDates(weekValue);
+      currentScheduleData = null;
+      renderScheduleTable();
+      renderWarnings([]);
+      renderContractProgress();
     }
   }
 
@@ -1305,6 +1649,7 @@ th { color: var(--muted); font-weight: 600; }
 
   renderEmployeeTable();
   renderRequirementsTable();
+  renderShiftHoursInputs();
   renderVerlofList();
   tryLoadExistingSchedule();
 })();
