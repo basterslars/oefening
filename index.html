@@ -197,19 +197,32 @@ legend {
 
 .dag-checkbox-label input { margin: 0; width: auto; }
 
-.dienst-select {
-  padding: 0.3rem 0.5rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 0.85rem;
-  max-width: 160px;
+.tijdsloten-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border);
 }
 
-.dienst-select:disabled {
-  opacity: 0.4;
+.tijdslot-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.tijdslot-option input { margin: 0; width: auto; }
+
+.tijdslot-option input:disabled {
   cursor: not-allowed;
+}
+
+.tijdslot-option:has(input:disabled) {
+  color: var(--muted);
+  opacity: 0.6;
 }
 
 .contract-checkbox-label {
@@ -413,11 +426,6 @@ th { color: var(--muted); font-weight: 600; }
   border-style: dashed;
 }
 
-#schedule-table select.avondspits {
-  border-style: dotted;
-  color: var(--accent-dark);
-}
-
 #schedule-table select.beschikbaar {
   border-color: var(--secondary);
   color: var(--secondary-dark);
@@ -430,6 +438,37 @@ th { color: var(--muted); font-weight: 600; }
 #schedule-table .slot-empty-option {
   color: var(--muted);
 }
+
+.tijdslot-badge {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: -0.15rem 0 0.4rem;
+}
+
+.tijdslot-badge.tijdslot-missing {
+  color: var(--danger);
+}
+
+#open-sluit-table textarea {
+  width: 100%;
+  min-width: 180px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  resize: vertical;
+}
+
+#open-sluit-table input[type="number"] {
+  width: 70px;
+}
+
+#open-sluit-table td, #open-sluit-table th {
+  vertical-align: top;
+}
 </style>
 </head>
 <body>
@@ -439,6 +478,7 @@ th { color: var(--muted); font-weight: 600; }
     <button class="tab-btn active" data-tab="medewerkers">Medewerkers</button>
     <button class="tab-btn" data-tab="bezetting">Bezetting</button>
     <button class="tab-btn" data-tab="rooster">Rooster</button>
+    <button class="tab-btn" data-tab="vrijvraging">Vrijvraging</button>
   </nav>
 </header>
 
@@ -460,8 +500,16 @@ th { color: var(--muted); font-weight: 600; }
         </fieldset>
 
         <fieldset>
+          <legend>Openen &amp; sluiten</legend>
+          <label class="contract-checkbox-label">
+            <input type="checkbox" id="employee-mag-open-tot-sluit">
+            Mag van openen tot sluiten werken (uitzondering — bepaalt of de "openen tot sluit"-tijdopties hieronder aanvinkbaar zijn)
+          </label>
+        </fieldset>
+
+        <fieldset>
           <legend>Vaste werkdagen</legend>
-          <p class="fieldset-hint">Dagen waarop iemand altijd staat ingepland. Vink een dag aan en geef aan of dat de hele dag is of alleen de avondspits.</p>
+          <p class="fieldset-hint">Dagen waarop iemand altijd staat ingepland. Vink een dag aan en kies daarna een of meer tijdopties waarop deze persoon die dag inzetbaar is (zie Bezetting-tab om de opties per dag aan te passen).</p>
           <div id="employee-vaste-dagen" class="dagen-list"></div>
         </fieldset>
 
@@ -541,22 +589,57 @@ th { color: var(--muted); font-weight: 600; }
   <!-- BEZETTING TAB -->
   <section id="tab-bezetting" class="tab-content">
     <div class="panel">
-      <h2>Uren per dienst</h2>
-      <p class="fieldset-hint">Wordt gebruikt om contracturen te berekenen op basis van wie welke dienst (hele dag / avondspits) draait.</p>
+      <h2>Openen &amp; sluiten</h2>
+      <p class="fieldset-hint">
+        Tijdopties (1 per regel, bijv. "16:30 - 20:00" of "17:00 - sluit") bepalen welke keuzes medewerkers straks kunnen
+        aanvinken bij hun werkdagen. Openers (1 per regel, bijv. "10:30,2" = 2 mensen om 10:30) en aantal sluiters
+        bepalen hoeveel mensen er op elk moment moeten openen/sluiten; de generator vult dit automatisch in.
+        "Sluitingstijd" is alleen voor de urenberekening — op het rooster zelf blijft "sluit" gewoon "sluit" staan.
+      </p>
+      <label>
+        Sluitingstijd (voor urenberekening)
+        <input type="time" id="sluitingstijd-input">
+      </label>
+      <div class="table-scroll">
+        <table id="open-sluit-table">
+          <thead>
+            <tr>
+              <th>Dag</th>
+              <th>Tijdopties</th>
+              <th>Openers</th>
+              <th>Aantal sluiters</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="form-actions">
+        <button id="save-open-sluit-btn" class="btn-primary">Opslaan</button>
+        <span id="open-sluit-saved-msg" class="saved-msg" hidden>Opgeslagen ✓</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Onmogelijke combinaties</h2>
+      <p class="fieldset-hint">Kies een taak en twee medewerkers die nooit tegelijk op die taak mogen staan (bijv. twee onervaren mensen niet samen aan de kassa).</p>
       <div class="contract-fields">
         <label>
-          Uren per hele dag-dienst
-          <input type="number" id="uren-heledag" min="0" step="0.5">
+          Taak
+          <select id="forbidden-task"></select>
         </label>
         <label>
-          Uren per avondspits-dienst
-          <input type="number" id="uren-avondspits" min="0" step="0.5">
+          Medewerker 1
+          <select id="forbidden-emp-a"></select>
+        </label>
+        <label>
+          Medewerker 2
+          <select id="forbidden-emp-b"></select>
         </label>
       </div>
       <div class="form-actions">
-        <button id="save-shift-hours-btn" class="btn-primary">Opslaan</button>
-        <span id="shift-hours-saved-msg" class="saved-msg" hidden>Opgeslagen ✓</span>
+        <button id="add-forbidden-pair-btn" class="btn-primary">Toevoegen</button>
       </div>
+      <ul id="forbidden-pairs-list" class="verlof-list"></ul>
     </div>
 
     <div class="panel">
@@ -619,6 +702,24 @@ th { color: var(--muted); font-weight: 600; }
       <p id="schedule-empty-msg" class="empty-msg">Nog geen rooster gegenereerd voor deze week.</p>
     </div>
   </section>
+
+  <!-- VRIJVRAGING TAB -->
+  <section id="tab-vrijvraging" class="tab-content">
+    <div class="panel">
+      <h2>Wie heeft er vrij gevraagd?</h2>
+      <p class="fieldset-hint">Overzicht per dag van deze week van wie er verlof heeft aangevraagd, zodat je meteen ziet wie niet in het rooster mag komen.</p>
+      <div class="rooster-controls">
+        <label>
+          Week
+          <input type="week" id="verlof-week-picker">
+        </label>
+      </div>
+      <div class="table-scroll">
+        <table id="verlof-overview-table"></table>
+      </div>
+      <p id="verlof-overview-empty" class="empty-msg" hidden>Niemand heeft vrij gevraagd deze week.</p>
+    </div>
+  </section>
 </main>
 
 <script>
@@ -656,14 +757,55 @@ th { color: var(--muted); font-weight: 600; }
     zondag: { kassa: 2, bakplaat: 2, friet: 1, snack: 1, fietsbezorgen: 3, autobezorgen: 1 },
   };
 
+  // Tijdopties, openers en aantal sluiters per dag. "Sluit" is een letterlijke waarde
+  // (geen vaste klok tijd) — pas op het rooster gewoon getoond als "sluit".
+  // Vrijdag heeft geen standaard tijdopties (nog niet aangeleverd); via Bezetting > Openen & sluiten aan te vullen.
+  const DEFAULT_OPEN_SLUIT = {
+    dinsdag: {
+      tijdsloten: ["14:00 - sluit", "14:00 - 19:30", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
+      openers: [{ tijd: "14:00", aantal: 2 }],
+      sluiters: 4,
+    },
+    woensdag: {
+      tijdsloten: ["10:30 - 19:30", "10:30 - sluit", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
+      openers: [{ tijd: "10:30", aantal: 2 }],
+      sluiters: 4,
+    },
+    donderdag: {
+      tijdsloten: [
+        "10:30 - 19:30", "10:30 - sluit", "14:00 - sluit", "14:00 - 20:00",
+        "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
+      ],
+      openers: [{ tijd: "10:30", aantal: 2 }],
+      sluiters: 4,
+    },
+    vrijdag: {
+      tijdsloten: [],
+      openers: [{ tijd: "10:00", aantal: 2 }, { tijd: "10:30", aantal: 1 }, { tijd: "11:00", aantal: 1 }],
+      sluiters: 4,
+    },
+    zaterdag: {
+      tijdsloten: ["10:30 - 19:30", "10:30 - sluit", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
+      openers: [{ tijd: "10:30", aantal: 2 }],
+      sluiters: 4,
+    },
+    zondag: {
+      tijdsloten: ["10:30 - 19:30", "10:30 - sluit", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
+      openers: [{ tijd: "10:30", aantal: 2 }],
+      sluiters: 4,
+    },
+  };
+  const DEFAULT_SLUITINGSTIJD = "21:00";
+
   const STORAGE_KEYS = {
     employees: "friettent_employees",
     requirements: "friettent_requirements",
     schedulePrefix: "friettent_schedule_",
-    shiftHours: "friettent_shift_hours",
+    openSluit: "friettent_open_sluit",
+    sluitingstijd: "friettent_sluitingstijd",
+    forbiddenPairs: "friettent_forbidden_pairs",
   };
 
-  const DEFAULT_SHIFT_HOURS = { heledag: 8, avondspits: 4 };
   const MIN_SHIFTS_PER_WEEK = 2;
   const WEKEN_PER_MAAND = 52 / 12;
 
@@ -685,16 +827,15 @@ th { color: var(--muted); font-weight: 600; }
         if (!entry) return;
         dagen[day] = {
           type: entry.type === "beschikbaar" ? "beschikbaar" : "vast",
-          dienst: entry.dienst === "avondspits" ? "avondspits" : "heledag",
+          // Migratie: het oudere hele-dag/avondspits-model kende geen concrete tijden,
+          // dus die dagen starten leeg en moeten opnieuw met tijdopties ingevuld worden.
+          tijdsloten: Array.isArray(entry.tijdsloten) ? entry.tijdsloten : [],
         };
       });
     } else if (Array.isArray(emp.vasteDagen)) {
-      // Migratie van het oudere formaat (vasteDagen[] + dienstType{}).
+      // Migratie van een nog ouder formaat (vasteDagen[] + dienstType{}).
       emp.vasteDagen.forEach((day) => {
-        dagen[day] = {
-          type: "vast",
-          dienst: emp.dienstType && emp.dienstType[day] === "avondspits" ? "avondspits" : "heledag",
-        };
+        dagen[day] = { type: "vast", tijdsloten: [] };
       });
     }
     const contract = emp.contract && typeof emp.contract === "object" ? emp.contract : {};
@@ -702,6 +843,7 @@ th { color: var(--muted); font-weight: 600; }
     delete clean.vasteDagen;
     delete clean.dienstType;
     clean.dagen = dagen;
+    clean.magOpenTotSluit = !!emp.magOpenTotSluit;
     clean.contract = {
       vast: !!contract.vast,
       uren: typeof contract.uren === "number" && contract.uren > 0 ? contract.uren : 0,
@@ -756,20 +898,44 @@ th { color: var(--muted); font-weight: 600; }
   function saveSchedule(weekValue, data) {
     localStorage.setItem(STORAGE_KEYS.schedulePrefix + weekValue, JSON.stringify(data));
   }
-  function loadShiftHours() {
+  function loadOpenSluit() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.shiftHours);
+      const raw = localStorage.getItem(STORAGE_KEYS.openSluit);
       const parsed = raw ? JSON.parse(raw) : {};
-      return {
-        heledag: typeof parsed.heledag === "number" ? parsed.heledag : DEFAULT_SHIFT_HOURS.heledag,
-        avondspits: typeof parsed.avondspits === "number" ? parsed.avondspits : DEFAULT_SHIFT_HOURS.avondspits,
-      };
+      const result = {};
+      DAYS.forEach((d) => {
+        const entry = parsed[d.key] || {};
+        const fallback = DEFAULT_OPEN_SLUIT[d.key];
+        result[d.key] = {
+          tijdsloten: Array.isArray(entry.tijdsloten) ? entry.tijdsloten : fallback.tijdsloten.slice(),
+          openers: Array.isArray(entry.openers) ? entry.openers : fallback.openers.slice(),
+          sluiters: typeof entry.sluiters === "number" ? entry.sluiters : fallback.sluiters,
+        };
+      });
+      return result;
     } catch (e) {
-      return Object.assign({}, DEFAULT_SHIFT_HOURS);
+      return JSON.parse(JSON.stringify(DEFAULT_OPEN_SLUIT));
     }
   }
-  function saveShiftHours(hours) {
-    localStorage.setItem(STORAGE_KEYS.shiftHours, JSON.stringify(hours));
+  function saveOpenSluit(data) {
+    localStorage.setItem(STORAGE_KEYS.openSluit, JSON.stringify(data));
+  }
+  function loadSluitingstijd() {
+    return localStorage.getItem(STORAGE_KEYS.sluitingstijd) || DEFAULT_SLUITINGSTIJD;
+  }
+  function saveSluitingstijd(val) {
+    localStorage.setItem(STORAGE_KEYS.sluitingstijd, val);
+  }
+  function loadForbiddenPairs() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.forbiddenPairs);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function saveForbiddenPairs(data) {
+    localStorage.setItem(STORAGE_KEYS.forbiddenPairs, JSON.stringify(data));
   }
   function listStoredWeeksBefore(weekValue) {
     const weeks = [];
@@ -787,7 +953,9 @@ th { color: var(--muted); font-weight: 600; }
 
   let employees = loadEmployees();
   let requirements = loadRequirements();
-  let shiftHours = loadShiftHours();
+  let openSluit = loadOpenSluit();
+  let sluitingstijd = loadSluitingstijd();
+  let forbiddenPairs = loadForbiddenPairs();
   let editingEmployeeId = null;
   let employeeFormVerlof = [];
   let currentWeekValue = null;
@@ -796,6 +964,106 @@ th { color: var(--muted); font-weight: 600; }
 
   function uid() {
     return "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  // ---------- Tijdsloten helpers ----------
+
+  function parseTijdslot(label) {
+    const parts = label.split(" - ").map((s) => s.trim());
+    return { label, start: parts[0], eind: parts[1] };
+  }
+  function tijdslotenForDay(dayKey) {
+    return ((openSluit[dayKey] && openSluit[dayKey].tijdsloten) || []).map(parseTijdslot);
+  }
+  function timeToMinutes(t) {
+    const [h, m] = (t || "0:0").split(":").map(Number);
+    return h * 60 + m;
+  }
+  function durationHours(start, eind) {
+    const eindResolved = eind === "sluit" ? sluitingstijd : eind;
+    const mins = timeToMinutes(eindResolved) - timeToMinutes(start);
+    return Math.max(0, mins) / 60;
+  }
+  function isOpenerStartForDay(dayKey, start) {
+    const openers = (openSluit[dayKey] && openSluit[dayKey].openers) || [];
+    return openers.some((o) => o.tijd === start);
+  }
+  // Tijdopties van een medewerker voor een dag, met de "openen-tot-sluit"-optie
+  // eruit gefilterd tenzij deze persoon daar expliciet toestemming voor heeft.
+  function employeeTijdslotOptions(emp, dayKey) {
+    const dagInfo = emp.dagen[dayKey];
+    const labels = dagInfo ? dagInfo.tijdsloten || [] : [];
+    return labels.map(parseTijdslot).filter((opt) => {
+      if (opt.eind === "sluit" && isOpenerStartForDay(dayKey, opt.start) && !emp.magOpenTotSluit) return false;
+      return true;
+    });
+  }
+  function gemiddeldeUrenPerDienstGeschat() {
+    const alleDuren = [];
+    DAYS.forEach((day) => {
+      tijdslotenForDay(day.key).forEach((opt) => alleDuren.push(durationHours(opt.start, opt.eind)));
+    });
+    if (!alleDuren.length) return 6;
+    return alleDuren.reduce((a, b) => a + b, 0) / alleDuren.length;
+  }
+
+  // Wijst voor een dag tijdopties toe aan de reeds op taken ingedeelde medewerkers: eerst
+  // de openers op de ingestelde openingstijden, dan precies het ingestelde aantal sluiters,
+  // en de rest krijgt een resterende optie (bij voorkeur niet tot sluit).
+  function assignTijdslotenForDay(dayKey, employeeIds) {
+    const daySettings = openSluit[dayKey] || { openers: [], sluiters: 0 };
+    const assignments = {};
+    const warnings = [];
+    const remaining = new Set(employeeIds);
+    const empById = (id) => employees.find((e) => e.id === id);
+
+    (daySettings.openers || []).forEach(({ tijd, aantal }) => {
+      const candidates = Array.from(remaining)
+        .map(empById)
+        .filter((e) => e && employeeTijdslotOptions(e, dayKey).some((o) => o.start === tijd))
+        .sort((a, b) => a.naam.localeCompare(b.naam));
+      const gekozen = candidates.slice(0, aantal);
+      gekozen.forEach((e) => {
+        const opts = employeeTijdslotOptions(e, dayKey).filter((o) => o.start === tijd);
+        assignments[e.id] = opts.find((o) => o.eind !== "sluit") || opts[0];
+        remaining.delete(e.id);
+      });
+      if (gekozen.length < aantal) {
+        warnings.push(`${dayLabel(dayKey)}: ${aantal - gekozen.length} tekort aan openers om ${tijd}`);
+      }
+    });
+
+    const sluitCountAlready = Object.values(assignments).filter((a) => a.eind === "sluit").length;
+    const sluitersNodig = (daySettings.sluiters || 0) - sluitCountAlready;
+    if (sluitersNodig > 0) {
+      const candidates = Array.from(remaining)
+        .map(empById)
+        .filter((e) => e && employeeTijdslotOptions(e, dayKey).some((o) => o.eind === "sluit"))
+        .sort((a, b) => a.naam.localeCompare(b.naam));
+      const gekozen = candidates.slice(0, sluitersNodig);
+      gekozen.forEach((e) => {
+        assignments[e.id] = employeeTijdslotOptions(e, dayKey).find((o) => o.eind === "sluit");
+        remaining.delete(e.id);
+      });
+      if (gekozen.length < sluitersNodig) {
+        warnings.push(`${dayLabel(dayKey)}: ${sluitersNodig - gekozen.length} tekort aan sluiters`);
+      }
+    } else if (sluitersNodig < 0) {
+      warnings.push(
+        `${dayLabel(dayKey)}: er staan meer mensen tot sluit ingepland dan de ${daySettings.sluiters} die nodig zijn`
+      );
+    }
+
+    remaining.forEach((id) => {
+      const e = empById(id);
+      if (!e) return;
+      const opts = employeeTijdslotOptions(e, dayKey);
+      const chosen = opts.find((o) => o.eind !== "sluit") || opts[0] || null;
+      if (chosen) assignments[id] = chosen;
+      else warnings.push(`${e.naam} heeft geen passende tijdoptie ingesteld voor ${dayLabel(dayKey)}.`);
+    });
+
+    return { assignments, warnings };
   }
 
   // ---------- Tabs ----------
@@ -841,19 +1109,70 @@ th { color: var(--muted); font-weight: 600; }
       label.appendChild(checkbox);
       label.appendChild(document.createTextNode(item.label));
 
-      const select = document.createElement("select");
-      select.className = "dienst-select";
-      select.disabled = true;
-      select.innerHTML = '<option value="heledag">Hele dag</option><option value="avondspits">Avondspits</option>';
+      const tijdslotenBox = document.createElement("div");
+      tijdslotenBox.className = "tijdsloten-box";
+      tijdslotenBox.dataset.day = item.key;
+      renderTijdslotCheckboxes(tijdslotenBox, item.key);
 
       checkbox.addEventListener("change", () => {
-        select.disabled = !checkbox.checked;
+        setTijdslotenBoxEnabled(tijdslotenBox, checkbox.checked);
         if (checkbox.checked) uncheckOtherGroup(groupName, item.key);
       });
 
       row.appendChild(label);
-      row.appendChild(select);
+      row.appendChild(tijdslotenBox);
       container.appendChild(row);
+    });
+  }
+
+  function renderTijdslotCheckboxes(box, dayKey) {
+    box.innerHTML = "";
+    const opts = tijdslotenForDay(dayKey);
+    if (!opts.length) {
+      box.innerHTML = '<span class="fieldset-hint">Geen tijdopties ingesteld voor deze dag (zie Bezetting-tab).</span>';
+      return;
+    }
+    opts.forEach((opt) => {
+      const lbl = document.createElement("label");
+      lbl.className = "tijdslot-option";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = opt.label;
+      cb.dataset.start = opt.start;
+      cb.dataset.eind = opt.eind;
+      cb.disabled = true;
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode(" " + opt.label));
+      box.appendChild(lbl);
+    });
+  }
+
+  function setTijdslotenBoxEnabled(box, enabled) {
+    box.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.disabled = !enabled;
+    });
+    if (enabled) applyOpenTotSluitRestriction(box);
+  }
+
+  function applyOpenTotSluitRestriction(box) {
+    const dayKey = box.dataset.day;
+    const allowed = magOpenTotSluitCheckbox.checked;
+    box.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      if (cb.disabled) return;
+      const isOpenTotSluit = cb.dataset.eind === "sluit" && isOpenerStartForDay(dayKey, cb.dataset.start);
+      if (isOpenTotSluit && !allowed) {
+        cb.disabled = true;
+        cb.checked = false;
+        cb.title = "Alleen toegestaan voor medewerkers die van openen tot sluiten mogen werken.";
+      }
+    });
+  }
+
+  function refreshAllOpenTotSluitRestrictions() {
+    document.querySelectorAll(".tijdsloten-box").forEach((box) => {
+      const row = box.closest(".dag-row");
+      const cb = row && row.querySelector('input[type="checkbox"][name="vast"], input[type="checkbox"][name="beschikbaar"]');
+      if (cb && cb.checked) applyOpenTotSluitRestriction(box);
     });
   }
 
@@ -863,16 +1182,18 @@ th { color: var(--muted); font-weight: 600; }
     const otherRow = otherContainer.querySelector(`.dag-row[data-day="${day}"]`);
     if (!otherRow) return;
     const otherCheckbox = otherRow.querySelector(`input[name="${otherGroupName}"]`);
-    const otherSelect = otherRow.querySelector(".dienst-select");
+    const otherBox = otherRow.querySelector(".tijdsloten-box");
     otherCheckbox.checked = false;
-    otherSelect.disabled = true;
+    setTijdslotenBoxEnabled(otherBox, false);
   }
 
   buildCheckboxGrid(document.getElementById("employee-taken"), TASKS, "taken");
   const vasteDagenContainer = document.getElementById("employee-vaste-dagen");
   const beschikbaarDagenContainer = document.getElementById("employee-beschikbaar-dagen");
+  const magOpenTotSluitCheckbox = document.getElementById("employee-mag-open-tot-sluit");
   buildDagenRows(vasteDagenContainer, DAYS, "vast");
   buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
+  magOpenTotSluitCheckbox.addEventListener("change", refreshAllOpenTotSluitRestrictions);
 
   function getCheckedValues(name) {
     return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((el) => el.value);
@@ -881,6 +1202,13 @@ th { color: var(--muted); font-weight: 600; }
     document.querySelectorAll(`input[name="${name}"]`).forEach((el) => {
       el.checked = values.includes(el.value);
     });
+  }
+
+  function getMagOpenTotSluit() {
+    return magOpenTotSluitCheckbox.checked;
+  }
+  function setMagOpenTotSluit(val) {
+    magOpenTotSluitCheckbox.checked = !!val;
   }
 
   function getDagenData() {
@@ -892,8 +1220,11 @@ th { color: var(--muted); font-weight: 600; }
       container.querySelectorAll(".dag-row").forEach((row) => {
         const day = row.dataset.day;
         const checkbox = row.querySelector(`input[name="${type}"]`);
-        const select = row.querySelector(".dienst-select");
-        if (checkbox.checked) dagen[day] = { type, dienst: select.value };
+        if (!checkbox.checked) return;
+        const tijdsloten = Array.from(row.querySelectorAll('.tijdsloten-box input[type="checkbox"]:checked')).map(
+          (cb) => cb.value
+        );
+        dagen[day] = { type, tijdsloten };
       });
     });
     return dagen;
@@ -907,12 +1238,15 @@ th { color: var(--muted); font-weight: 600; }
       container.querySelectorAll(".dag-row").forEach((row) => {
         const day = row.dataset.day;
         const checkbox = row.querySelector(`input[name="${type}"]`);
-        const select = row.querySelector(".dienst-select");
+        const box = row.querySelector(".tijdsloten-box");
         const entry = dagen[day];
         const checked = !!entry && entry.type === type;
         checkbox.checked = checked;
-        select.disabled = !checked;
-        select.value = checked ? entry.dienst : "heledag";
+        setTijdslotenBoxEnabled(box, checked);
+        const selected = new Set(checked ? entry.tijdsloten : []);
+        box.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+          cb.checked = !cb.disabled && selected.has(cb.value);
+        });
       });
     });
   }
@@ -985,6 +1319,7 @@ th { color: var(--muted); font-weight: 600; }
     employeeFormVerlof = [];
     document.getElementById("employee-form").reset();
     setCheckedValues("taken", []);
+    setMagOpenTotSluit(false);
     setDagenData({});
     setContractData(null);
     renderVerlofList();
@@ -997,6 +1332,7 @@ th { color: var(--muted); font-weight: 600; }
     const naam = document.getElementById("employee-naam").value.trim();
     if (!naam) return;
     const taken = getCheckedValues("taken");
+    const magOpenTotSluit = getMagOpenTotSluit();
     const dagen = getDagenData();
     const contract = getContractData();
 
@@ -1004,6 +1340,7 @@ th { color: var(--muted); font-weight: 600; }
       const emp = employees.find((e) => e.id === editingEmployeeId);
       emp.naam = naam;
       emp.taken = taken;
+      emp.magOpenTotSluit = magOpenTotSluit;
       emp.dagen = dagen;
       emp.contract = contract;
       emp.verlof = employeeFormVerlof.slice();
@@ -1012,6 +1349,7 @@ th { color: var(--muted); font-weight: 600; }
         id: uid(),
         naam,
         taken,
+        magOpenTotSluit,
         dagen,
         contract,
         verlof: employeeFormVerlof.slice(),
@@ -1031,6 +1369,7 @@ th { color: var(--muted); font-weight: 600; }
     employeeFormVerlof = emp.verlof.slice();
     document.getElementById("employee-naam").value = emp.naam;
     setCheckedValues("taken", emp.taken);
+    setMagOpenTotSluit(emp.magOpenTotSluit);
     setDagenData(emp.dagen);
     setContractData(emp.contract);
     renderVerlofList();
@@ -1063,7 +1402,8 @@ th { color: var(--muted); font-weight: 600; }
         const tr = document.createElement("tr");
 
         const tdNaam = document.createElement("td");
-        tdNaam.textContent = emp.naam;
+        tdNaam.textContent = emp.naam + (emp.magOpenTotSluit ? " 🔓" : "");
+        if (emp.magOpenTotSluit) tdNaam.title = "Mag van openen tot sluiten werken";
         tr.appendChild(tdNaam);
 
         const tdTaken = document.createElement("td");
@@ -1075,7 +1415,7 @@ th { color: var(--muted); font-weight: 600; }
           vasteDagenOf(emp)
             .map(
               (d) =>
-                `<span class="tag">${dayLabel(d)}${emp.dagen[d].dienst === "avondspits" ? " · avondspits" : ""}</span>`
+                `<span class="tag">${dayLabel(d)}: ${(emp.dagen[d].tijdsloten || []).join(", ") || "geen tijden gekozen"}</span>`
             )
             .join("") || "—";
         tr.appendChild(tdDagen);
@@ -1085,8 +1425,8 @@ th { color: var(--muted); font-weight: 600; }
           beschikbareDagenOf(emp)
             .map(
               (d) =>
-                `<span class="tag tag-beschikbaar">${dayLabel(d)}${
-                  emp.dagen[d].dienst === "avondspits" ? " · avondspits" : ""
+                `<span class="tag tag-beschikbaar">${dayLabel(d)}: ${
+                  (emp.dagen[d].tijdsloten || []).join(", ") || "geen tijden gekozen"
                 }</span>`
             )
             .join("") || "—";
@@ -1117,12 +1457,15 @@ th { color: var(--muted); font-weight: 600; }
 
         tbody.appendChild(tr);
       });
+
+    renderForbiddenEmployeeSelects();
+    renderVerlofOverview();
   }
 
   // ---------- Export / import ----------
 
   document.getElementById("export-btn").addEventListener("click", () => {
-    const data = { employees, requirements };
+    const data = { employees, requirements, openSluit, sluitingstijd, forbiddenPairs };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1147,8 +1490,23 @@ th { color: var(--muted); font-weight: 600; }
           requirements = data.requirements;
           saveRequirements(requirements);
         }
+        if (data.openSluit) {
+          openSluit = data.openSluit;
+          saveOpenSluit(openSluit);
+        }
+        if (data.sluitingstijd) {
+          sluitingstijd = data.sluitingstijd;
+          saveSluitingstijd(sluitingstijd);
+        }
+        if (data.forbiddenPairs) {
+          forbiddenPairs = data.forbiddenPairs;
+          saveForbiddenPairs(forbiddenPairs);
+        }
+        buildDagenRows(vasteDagenContainer, DAYS, "vast");
+        buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
         renderEmployeeTable();
         renderRequirementsTable();
+        renderOpenSluitTable();
         resetEmployeeForm();
         alert("Import gelukt.");
       } catch (err) {
@@ -1211,21 +1569,142 @@ th { color: var(--muted); font-weight: 600; }
     renderRequirementsTable();
   });
 
-  // ---------- Uren per dienst ----------
+  // ---------- Openen & sluiten ----------
 
-  function renderShiftHoursInputs() {
-    document.getElementById("uren-heledag").value = shiftHours.heledag;
-    document.getElementById("uren-avondspits").value = shiftHours.avondspits;
+  function renderOpenSluitTable() {
+    document.getElementById("sluitingstijd-input").value = sluitingstijd;
+    const tbody = document.createElement("tbody");
+    DAYS.forEach((day) => {
+      const settings = openSluit[day.key];
+      const tr = document.createElement("tr");
+
+      const tdDag = document.createElement("td");
+      tdDag.textContent = day.label;
+      tr.appendChild(tdDag);
+
+      const tdTijd = document.createElement("td");
+      const tijdTextarea = document.createElement("textarea");
+      tijdTextarea.id = `open-sluit-tijdsloten-${day.key}`;
+      tijdTextarea.rows = 4;
+      tijdTextarea.placeholder = '16:30 - 20:00\n17:00 - sluit';
+      tijdTextarea.value = settings.tijdsloten.join("\n");
+      tdTijd.appendChild(tijdTextarea);
+      tr.appendChild(tdTijd);
+
+      const tdOpeners = document.createElement("td");
+      const openersTextarea = document.createElement("textarea");
+      openersTextarea.id = `open-sluit-openers-${day.key}`;
+      openersTextarea.rows = 4;
+      openersTextarea.placeholder = "10:30,2";
+      openersTextarea.value = settings.openers.map((o) => `${o.tijd},${o.aantal}`).join("\n");
+      tdOpeners.appendChild(openersTextarea);
+      tr.appendChild(tdOpeners);
+
+      const tdSluiters = document.createElement("td");
+      const sluitersInput = document.createElement("input");
+      sluitersInput.type = "number";
+      sluitersInput.min = "0";
+      sluitersInput.id = `open-sluit-sluiters-${day.key}`;
+      sluitersInput.value = settings.sluiters;
+      tdSluiters.appendChild(sluitersInput);
+      tr.appendChild(tdSluiters);
+
+      tbody.appendChild(tr);
+    });
+    const table = document.getElementById("open-sluit-table");
+    table.querySelector("tbody")?.remove();
+    table.appendChild(tbody);
   }
 
-  document.getElementById("save-shift-hours-btn").addEventListener("click", () => {
-    const heledag = parseFloat(document.getElementById("uren-heledag").value) || 0;
-    const avondspits = parseFloat(document.getElementById("uren-avondspits").value) || 0;
-    shiftHours = { heledag, avondspits };
-    saveShiftHours(shiftHours);
-    const msg = document.getElementById("shift-hours-saved-msg");
+  document.getElementById("save-open-sluit-btn").addEventListener("click", () => {
+    const next = {};
+    DAYS.forEach((day) => {
+      const tijdsloten = document
+        .getElementById(`open-sluit-tijdsloten-${day.key}`)
+        .value.split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const openers = document
+        .getElementById(`open-sluit-openers-${day.key}`)
+        .value.split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [tijd, aantal] = line.split(",").map((s) => s.trim());
+          return { tijd, aantal: parseInt(aantal, 10) || 0 };
+        })
+        .filter((o) => o.tijd);
+      const sluiters = parseInt(document.getElementById(`open-sluit-sluiters-${day.key}`).value, 10) || 0;
+      next[day.key] = { tijdsloten, openers, sluiters };
+    });
+    openSluit = next;
+    saveOpenSluit(openSluit);
+    sluitingstijd = document.getElementById("sluitingstijd-input").value || DEFAULT_SLUITINGSTIJD;
+    saveSluitingstijd(sluitingstijd);
+    // Tijdopties per dag zijn veranderd: bouw de aanvink-lijsten in het medewerkersformulier opnieuw op.
+    buildDagenRows(vasteDagenContainer, DAYS, "vast");
+    buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
+    const msg = document.getElementById("open-sluit-saved-msg");
     msg.hidden = false;
     setTimeout(() => (msg.hidden = true), 2000);
+  });
+
+  // ---------- Onmogelijke combinaties ----------
+
+  function renderForbiddenEmployeeSelects() {
+    const optionsHtml = employees
+      .slice()
+      .sort((a, b) => a.naam.localeCompare(b.naam))
+      .map((e) => `<option value="${e.id}">${e.naam}</option>`)
+      .join("");
+    const selA = document.getElementById("forbidden-emp-a");
+    const selB = document.getElementById("forbidden-emp-b");
+    if (selA) selA.innerHTML = optionsHtml;
+    if (selB) selB.innerHTML = optionsHtml;
+  }
+
+  function renderForbiddenPairsList() {
+    const ul = document.getElementById("forbidden-pairs-list");
+    ul.innerHTML = "";
+    Object.entries(forbiddenPairs).forEach(([taskKey, pairs]) => {
+      pairs.forEach((pair, idx) => {
+        const empA = employees.find((e) => e.id === pair[0]);
+        const empB = employees.find((e) => e.id === pair[1]);
+        if (!empA || !empB) return;
+        const li = document.createElement("li");
+        li.textContent = `${taskLabel(taskKey)}: ${empA.naam} + ${empB.naam} `;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "✕";
+        btn.addEventListener("click", () => {
+          forbiddenPairs[taskKey].splice(idx, 1);
+          if (!forbiddenPairs[taskKey].length) delete forbiddenPairs[taskKey];
+          saveForbiddenPairs(forbiddenPairs);
+          renderForbiddenPairsList();
+        });
+        li.appendChild(btn);
+        ul.appendChild(li);
+      });
+    });
+  }
+
+  function renderForbiddenTaskSelect() {
+    document.getElementById("forbidden-task").innerHTML = TASKS.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+  }
+
+  document.getElementById("add-forbidden-pair-btn").addEventListener("click", () => {
+    const task = document.getElementById("forbidden-task").value;
+    const a = document.getElementById("forbidden-emp-a").value;
+    const b = document.getElementById("forbidden-emp-b").value;
+    if (!a || !b || a === b) {
+      alert("Kies twee verschillende medewerkers.");
+      return;
+    }
+    forbiddenPairs[task] = forbiddenPairs[task] || [];
+    const exists = forbiddenPairs[task].some((p) => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a));
+    if (!exists) forbiddenPairs[task].push([a, b]);
+    saveForbiddenPairs(forbiddenPairs);
+    renderForbiddenPairsList();
   });
 
   // ---------- Week helpers ----------
@@ -1260,18 +1739,23 @@ th { color: var(--muted); font-weight: 600; }
 
   // ---------- Contracturen ----------
 
+  // Bepaalt per dag wie er die dag ergens is ingepland, wijst daar (via
+  // assignTijdslotenForDay) een concreet tijdslot aan toe, en telt de uren op basis
+  // van de daadwerkelijk gekozen tijdopties (met "sluit" omgerekend via sluitingstijd).
   function computeHoursForEmployeeInWeek(emp, scheduleData) {
     let hours = 0;
     const schedule = scheduleData.schedule;
     Object.keys(schedule).forEach((dayKey) => {
+      const idsToday = new Set();
       Object.keys(schedule[dayKey]).forEach((task) => {
         (schedule[dayKey][task] || []).forEach((id) => {
-          if (id !== emp.id) return;
-          const dagInfo = emp.dagen[dayKey];
-          const dienst = dagInfo ? dagInfo.dienst : "heledag";
-          hours += shiftHours[dienst] || 0;
+          if (id) idsToday.add(id);
         });
       });
+      if (!idsToday.has(emp.id)) return;
+      const { assignments } = assignTijdslotenForDay(dayKey, Array.from(idsToday));
+      const opt = assignments[emp.id];
+      if (opt) hours += durationHours(opt.start, opt.eind);
     });
     return hours;
   }
@@ -1294,21 +1778,22 @@ th { color: var(--muted); font-weight: 600; }
 
   function generateSchedule(weekDates, reqs, weekValue) {
     const shiftCount = {};
-    const hoursCount = {};
     const saldoBefore = {};
-    const effectiveTargetHours = {};
+    const effectiveTargetShifts = {};
+    const gemiddeldeUren = gemiddeldeUrenPerDienstGeschat();
     employees.forEach((e) => {
       shiftCount[e.id] = 0;
-      hoursCount[e.id] = 0;
       saldoBefore[e.id] = computeSaldoBeforeWeek(e, weekValue);
       const baseTarget = weeklyTargetHoursFor(e);
       if (baseTarget === null) {
-        effectiveTargetHours[e.id] = null;
+        effectiveTargetShifts[e.id] = null;
       } else {
         // Tekort van eerdere weken verhoogt dit weekdoel; overschot verlaagt het.
         // Begrensd zodat een lang tekort niet in één week ingehaald hoeft te worden.
-        const adjusted = baseTarget - saldoBefore[e.id];
-        effectiveTargetHours[e.id] = Math.max(0, Math.min(adjusted, baseTarget * 2));
+        // Omgerekend naar een geschat aantal diensten, omdat de exacte uren pas na de
+        // tijdslot-toewijzing bekend zijn — de contracturenweergave rekent wél precies.
+        const adjustedHours = Math.max(0, Math.min(baseTarget - saldoBefore[e.id], baseTarget * 2));
+        effectiveTargetShifts[e.id] = adjustedHours / gemiddeldeUren;
       }
     });
     const schedule = {};
@@ -1341,11 +1826,11 @@ th { color: var(--muted); font-weight: 600; }
       });
 
       // Wie nog onder het minimum van 2 diensten zit, of wie (bij een vast contract) nog
-      // niet aan de (voor eerdere over/onderschotten gecorrigeerde) urennorm zit, krijgt
-      // voorrang boven mensen die al genoeg hebben. Binnen die groepen geldt eerlijke
-      // verdeling op basis van aantal diensten tot nu toe.
+      // niet aan het (voor eerdere over/onderschotten gecorrigeerde, geschatte) aantal
+      // diensten zit, krijgt voorrang boven mensen die al genoeg hebben. Binnen die
+      // groepen geldt eerlijke verdeling op basis van aantal diensten tot nu toe.
       const needsMore = (e) => {
-        if (effectiveTargetHours[e.id] !== null) return hoursCount[e.id] < effectiveTargetHours[e.id];
+        if (effectiveTargetShifts[e.id] !== null) return shiftCount[e.id] < effectiveTargetShifts[e.id];
         return shiftCount[e.id] < MIN_SHIFTS_PER_WEEK;
       };
       const byPriority = (a, b) => {
@@ -1357,20 +1842,28 @@ th { color: var(--muted); font-weight: 600; }
 
       taskEntries.forEach(([task, count]) => {
         const notAssigned = (e) => !assignedToday.has(e.id);
+        const pairs = forbiddenPairs[task] || [];
+        const conflicts = (candidate, chosenSoFar) =>
+          chosenSoFar.some((c) => pairs.some((p) => p.includes(c.id) && p.includes(candidate.id)));
 
-        const chosen = vastePool(task).filter(notAssigned).sort(byPriority).slice(0, count);
+        const chosen = [];
+        const vasteCandidates = vastePool(task).filter(notAssigned).sort(byPriority);
+        for (const cand of vasteCandidates) {
+          if (chosen.length >= count) break;
+          if (conflicts(cand, chosen)) continue;
+          chosen.push(cand);
+        }
         if (chosen.length < count) {
-          const aanvulling = beschikbaarPool(task)
-            .filter(notAssigned)
-            .sort(byPriority)
-            .slice(0, count - chosen.length);
-          chosen.push(...aanvulling);
+          const beschikbaarCandidates = beschikbaarPool(task).filter(notAssigned).sort(byPriority);
+          for (const cand of beschikbaarCandidates) {
+            if (chosen.length >= count) break;
+            if (conflicts(cand, chosen)) continue;
+            chosen.push(cand);
+          }
         }
         chosen.forEach((e) => {
           assignedToday.add(e.id);
           shiftCount[e.id]++;
-          const dienst = e.dagen[day.key] ? e.dagen[day.key].dienst : "heledag";
-          hoursCount[e.id] += shiftHours[dienst] || 0;
         });
         const ids = chosen.map((e) => e.id);
         while (ids.length < count) ids.push(null);
@@ -1383,23 +1876,9 @@ th { color: var(--muted); font-weight: 600; }
       });
     });
 
-    // Signaleer wie onder de 2 diensten blijft terwijl dat vermijdbaar leek.
-    employees.forEach((e) => {
-      if (shiftCount[e.id] >= MIN_SHIFTS_PER_WEEK) return;
-      const potentieleDagen = weekDates.filter(
-        (day) =>
-          e.dagen[day.key] &&
-          !e.verlof.includes(day.dateIso) &&
-          e.taken.some((t) => (reqs[day.key] || {})[t] > 0)
-      ).length;
-      if (potentieleDagen >= MIN_SHIFTS_PER_WEEK) {
-        warnings.push(
-          `${e.naam} heeft maar ${shiftCount[e.id]} dienst(en) deze week (streefdoel: minimaal ${MIN_SHIFTS_PER_WEEK}).`
-        );
-      }
-    });
-
-    return { schedule, warnings, hoursCount, effectiveTargetHours, saldoBefore };
+    // Tekorten aan taken-bezetting zitten al in `warnings`; het minimum van 2 diensten en
+    // eventuele open/sluit-tekorten worden na het opslaan herberekend via computeWarningsFromCurrent().
+    return { schedule, warnings };
   }
 
   // ---------- Schedule rendering ----------
@@ -1448,13 +1927,11 @@ th { color: var(--muted); font-weight: 600; }
           employeesForTask(task.key).forEach((emp) => {
             const selected = emp.id === currentId ? "selected" : "";
             const dagInfo = emp.dagen[day.key];
-            const labels = [];
-            if (dagInfo && dagInfo.type === "beschikbaar") labels.push("beschikbaar");
-            if (dagInfo && dagInfo.dienst === "avondspits") labels.push("avondspits");
-            const suffix = labels.length ? ` (${labels.join(", ")})` : "";
+            const suffix = dagInfo && dagInfo.type === "beschikbaar" ? " (beschikbaar)" : "";
             html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
           });
           html += `</select>`;
+          html += `<div class="tijdslot-badge" data-day="${day.key}" data-task="${task.key}" data-idx="${i}"></div>`;
         }
         html += "</td>";
       });
@@ -1464,15 +1941,16 @@ th { color: var(--muted); font-weight: 600; }
     table.innerHTML = html;
 
     table.querySelectorAll("select").forEach((select) => {
-      applySelectWarningClass(select, day => day);
+      applySelectWarningClass(select);
       select.addEventListener("change", onScheduleSelectChange);
     });
+    refreshTijdslotBadges();
   }
 
   function applySelectWarningClass(select) {
     const day = select.dataset.day;
     const empId = select.value;
-    select.classList.remove("not-fixed-day", "on-verlof", "avondspits", "beschikbaar");
+    select.classList.remove("not-fixed-day", "on-verlof", "beschikbaar");
     if (!empId) return;
     const emp = employees.find((e) => e.id === empId);
     if (!emp) return;
@@ -1480,11 +1958,44 @@ th { color: var(--muted); font-weight: 600; }
     const dagInfo = emp.dagen[day];
     if (!dagInfo) {
       select.classList.add("not-fixed-day");
-    } else {
-      if (dagInfo.type === "beschikbaar") select.classList.add("beschikbaar");
-      if (dagInfo.dienst === "avondspits") select.classList.add("avondspits");
+    } else if (dagInfo.type === "beschikbaar") {
+      select.classList.add("beschikbaar");
     }
     if (dayInfo && emp.verlof.includes(dayInfo.dateIso)) select.classList.add("on-verlof");
+  }
+
+  // Herberekent per dag welk tijdslot elke ingedeelde medewerker krijgt (openers/sluiters/rest)
+  // en zet dat als klein label onder de bijbehorende select.
+  function refreshTijdslotBadges() {
+    if (!currentScheduleData || !currentWeekDates) return;
+    const { schedule } = currentScheduleData;
+    currentWeekDates.forEach((day) => {
+      const idsToday = new Set();
+      Object.keys(schedule[day.key] || {}).forEach((task) => {
+        (schedule[day.key][task] || []).forEach((id) => {
+          if (id) idsToday.add(id);
+        });
+      });
+      const { assignments } = assignTijdslotenForDay(day.key, Array.from(idsToday));
+      document.querySelectorAll(`.tijdslot-badge[data-day="${day.key}"]`).forEach((badge) => {
+        const task = badge.dataset.task;
+        const idx = Number(badge.dataset.idx);
+        const id = (schedule[day.key][task] || [])[idx];
+        if (!id) {
+          badge.textContent = "";
+          badge.classList.remove("tijdslot-missing");
+          return;
+        }
+        const opt = assignments[id];
+        if (opt) {
+          badge.textContent = `${opt.start} – ${opt.eind === "sluit" ? "sluit" : opt.eind}`;
+          badge.classList.remove("tijdslot-missing");
+        } else {
+          badge.textContent = "geen tijdoptie";
+          badge.classList.add("tijdslot-missing");
+        }
+      });
+    });
   }
 
   function onScheduleSelectChange(e) {
@@ -1495,6 +2006,7 @@ th { color: var(--muted); font-weight: 600; }
     saveSchedule(currentWeekValue, currentScheduleData);
     applySelectWarningClass(select);
     updateUnderstaffedHighlight();
+    refreshTijdslotBadges();
     renderWarnings(computeWarningsFromCurrent());
     renderContractProgress();
   }
@@ -1551,6 +2063,17 @@ th { color: var(--muted); font-weight: 600; }
           `${e.naam} heeft maar ${shiftCounts[e.id]} dienst(en) deze week (streefdoel: minimaal ${MIN_SHIFTS_PER_WEEK}).`
         );
       }
+    });
+
+    currentWeekDates.forEach((day) => {
+      const idsToday = new Set();
+      Object.keys(schedule[day.key] || {}).forEach((task) => {
+        (schedule[day.key][task] || []).forEach((id) => {
+          if (id) idsToday.add(id);
+        });
+      });
+      const { warnings: tijdslotWarnings } = assignTijdslotenForDay(day.key, Array.from(idsToday));
+      warnings.push(...tijdslotWarnings);
     });
 
     return warnings;
@@ -1614,11 +2137,11 @@ th { color: var(--muted); font-weight: 600; }
     currentWeekValue = weekValue;
     currentWeekDates = computeWeekDates(weekValue);
     const requirementsSnapshot = JSON.parse(JSON.stringify(requirements));
-    const { schedule, warnings } = generateSchedule(currentWeekDates, requirementsSnapshot, weekValue);
+    const { schedule } = generateSchedule(currentWeekDates, requirementsSnapshot, weekValue);
     currentScheduleData = { schedule, requirementsSnapshot };
     saveSchedule(currentWeekValue, currentScheduleData);
     renderScheduleTable();
-    renderWarnings(warnings);
+    renderWarnings(computeWarningsFromCurrent());
     renderContractProgress();
   });
 
@@ -1645,12 +2168,48 @@ th { color: var(--muted); font-weight: 600; }
 
   weekPicker.addEventListener("change", tryLoadExistingSchedule);
 
+  // ---------- Vrijvraging ----------
+
+  const verlofWeekPicker = document.getElementById("verlof-week-picker");
+  verlofWeekPicker.value = isoWeekStringFor(new Date());
+
+  function renderVerlofOverview() {
+    const weekValue = verlofWeekPicker.value || isoWeekStringFor(new Date());
+    const weekDates = computeWeekDates(weekValue);
+    const table = document.getElementById("verlof-overview-table");
+    const emptyMsg = document.getElementById("verlof-overview-empty");
+
+    const rows = weekDates.map((day) => ({
+      day,
+      namen: employees
+        .filter((e) => e.verlof.includes(day.dateIso))
+        .map((e) => e.naam)
+        .sort(),
+    }));
+
+    emptyMsg.hidden = rows.some((r) => r.namen.length > 0);
+
+    let html = "<thead><tr><th>Dag</th><th>Wie heeft vrij gevraagd</th></tr></thead><tbody>";
+    rows.forEach(({ day, namen }) => {
+      html += `<tr><td>${day.label}<br><small>${day.dateIso}</small></td><td>${
+        namen.length ? namen.map((n) => `<span class="tag">${n}</span>`).join("") : "—"
+      }</td></tr>`;
+    });
+    html += "</tbody>";
+    table.innerHTML = html;
+  }
+
+  verlofWeekPicker.addEventListener("change", renderVerlofOverview);
+
   // ---------- Init ----------
 
   renderEmployeeTable();
   renderRequirementsTable();
-  renderShiftHoursInputs();
+  renderOpenSluitTable();
+  renderForbiddenTaskSelect();
+  renderForbiddenPairsList();
   renderVerlofList();
+  renderVerlofOverview();
   tryLoadExistingSchedule();
 })();
 </script>
