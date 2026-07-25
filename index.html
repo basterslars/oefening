@@ -543,8 +543,15 @@ th { color: var(--muted); font-weight: 600; }
 
         <fieldset>
           <legend>Verlof aangevraagd (specifieke data)</legend>
+          <p class="fieldset-hint">Vrij vragen kan voor de hele dag, of voor een deel ervan (bijv. "vanaf 16:30 vrij" — kan dan die dag nog wel tot 16:30 werken).</p>
           <div class="verlof-input-row">
             <input type="date" id="employee-verlof-datum">
+            <select id="employee-verlof-type">
+              <option value="hele_dag">Hele dag</option>
+              <option value="vanaf">Vanaf tijdstip vrij</option>
+              <option value="tot">Tot tijdstip vrij</option>
+            </select>
+            <input type="time" id="employee-verlof-tijd" hidden>
             <button type="button" id="add-verlof-btn" class="btn-secondary">+ Toevoegen</button>
           </div>
           <ul id="employee-verlof-list" class="verlof-list"></ul>
@@ -759,7 +766,7 @@ th { color: var(--muted); font-weight: 600; }
 
   // Tijdopties, openers en aantal sluiters per dag. "Sluit" is een letterlijke waarde
   // (geen vaste klok tijd) — pas op het rooster gewoon getoond als "sluit".
-  // Vrijdag heeft geen standaard tijdopties (nog niet aangeleverd); via Bezetting > Openen & sluiten aan te vullen.
+  // Zaterdag is een aanname (zelfde patroon als woensdag); via Bezetting > Openen & sluiten aan te passen.
   const DEFAULT_OPEN_SLUIT = {
     dinsdag: {
       tijdsloten: ["14:00 - sluit", "14:00 - 19:30", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
@@ -780,7 +787,10 @@ th { color: var(--muted); font-weight: 600; }
       sluiters: 4,
     },
     vrijdag: {
-      tijdsloten: [],
+      tijdsloten: [
+        "10:00 - 19:30", "10:30 - 19:30", "10:30 - sluit", "11:00 - 20:00", "11:00 - sluit",
+        "15:00 - sluit", "15:00 - 20:00", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
+      ],
       openers: [{ tijd: "10:00", aantal: 2 }, { tijd: "10:30", aantal: 1 }, { tijd: "11:00", aantal: 1 }],
       sluiters: 4,
     },
@@ -790,7 +800,10 @@ th { color: var(--muted); font-weight: 600; }
       sluiters: 4,
     },
     zondag: {
-      tijdsloten: ["10:30 - 19:30", "10:30 - sluit", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
+      tijdsloten: [
+        "10:30 - 19:30", "10:30 - sluit", "14:00 - sluit", "14:00 - 20:00",
+        "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
+      ],
       openers: [{ tijd: "10:30", aantal: 2 }],
       sluiters: 4,
     },
@@ -839,10 +852,16 @@ th { color: var(--muted); font-weight: 600; }
       });
     }
     const contract = emp.contract && typeof emp.contract === "object" ? emp.contract : {};
+    // Migratie: verlof was een lijst van datumstrings (altijd hele dag); nu een lijst
+    // van { datum, type: 'hele_dag'|'vanaf'|'tot', tijd } zodat een deel van de dag ook kan.
+    const verlof = Array.isArray(emp.verlof)
+      ? emp.verlof.map((v) => (typeof v === "string" ? { datum: v, type: "hele_dag", tijd: null } : v))
+      : [];
     const clean = Object.assign({}, emp);
     delete clean.vasteDagen;
     delete clean.dienstType;
     clean.dagen = dagen;
+    clean.verlof = verlof;
     clean.magOpenTotSluit = !!emp.magOpenTotSluit;
     clean.contract = {
       vast: !!contract.vast,
@@ -855,6 +874,14 @@ th { color: var(--muted); font-weight: 600; }
   function weeklyTargetHoursFor(emp) {
     if (!emp.contract || !emp.contract.vast || !emp.contract.uren) return null;
     return emp.contract.periode === "maand" ? emp.contract.uren / WEKEN_PER_MAAND : emp.contract.uren;
+  }
+
+  function verlofEntryFor(emp, dateIso) {
+    return emp.verlof.find((v) => v.datum === dateIso) || null;
+  }
+  function hasFullDayVerlof(emp, dateIso) {
+    const entry = verlofEntryFor(emp, dateIso);
+    return !!entry && entry.type === "hele_dag";
   }
 
   function vasteDagenOf(emp) {
@@ -988,15 +1015,33 @@ th { color: var(--muted); font-weight: 600; }
     const openers = (openSluit[dayKey] && openSluit[dayKey].openers) || [];
     return openers.some((o) => o.tijd === start);
   }
-  // Tijdopties van een medewerker voor een dag, met de "openen-tot-sluit"-optie
-  // eruit gefilterd tenzij deze persoon daar expliciet toestemming voor heeft.
-  function employeeTijdslotOptions(emp, dayKey) {
+  // Tijdopties van een medewerker voor een dag, met de "openen-tot-sluit"-optie eruit
+  // gefilterd tenzij deze persoon daar expliciet toestemming voor heeft, en — als een
+  // specifieke datum wordt meegegeven — verder ingeperkt door gedeeltelijk verlof die dag.
+  function employeeTijdslotOptions(emp, dayKey, dateIso) {
     const dagInfo = emp.dagen[dayKey];
     const labels = dagInfo ? dagInfo.tijdsloten || [] : [];
-    return labels.map(parseTijdslot).filter((opt) => {
+    let opts = labels.map(parseTijdslot).filter((opt) => {
       if (opt.eind === "sluit" && isOpenerStartForDay(dayKey, opt.start) && !emp.magOpenTotSluit) return false;
       return true;
     });
+    if (dateIso) {
+      const verlofEntry = verlofEntryFor(emp, dateIso);
+      if (verlofEntry) {
+        if (verlofEntry.type === "hele_dag") {
+          opts = [];
+        } else if (verlofEntry.type === "vanaf") {
+          // Vrij vanaf een tijdstip: alleen opties die daarvoor al klaar zijn.
+          const cutoff = timeToMinutes(verlofEntry.tijd);
+          opts = opts.filter((opt) => timeToMinutes(opt.eind === "sluit" ? sluitingstijd : opt.eind) <= cutoff);
+        } else if (verlofEntry.type === "tot") {
+          // Vrij tot een tijdstip: alleen opties die daarna pas beginnen.
+          const cutoff = timeToMinutes(verlofEntry.tijd);
+          opts = opts.filter((opt) => timeToMinutes(opt.start) >= cutoff);
+        }
+      }
+    }
+    return opts;
   }
   function gemiddeldeUrenPerDienstGeschat() {
     const alleDuren = [];
@@ -1010,7 +1055,7 @@ th { color: var(--muted); font-weight: 600; }
   // Wijst voor een dag tijdopties toe aan de reeds op taken ingedeelde medewerkers: eerst
   // de openers op de ingestelde openingstijden, dan precies het ingestelde aantal sluiters,
   // en de rest krijgt een resterende optie (bij voorkeur niet tot sluit).
-  function assignTijdslotenForDay(dayKey, employeeIds) {
+  function assignTijdslotenForDay(dayKey, dateIso, employeeIds) {
     const daySettings = openSluit[dayKey] || { openers: [], sluiters: 0 };
     const assignments = {};
     const warnings = [];
@@ -1020,11 +1065,11 @@ th { color: var(--muted); font-weight: 600; }
     (daySettings.openers || []).forEach(({ tijd, aantal }) => {
       const candidates = Array.from(remaining)
         .map(empById)
-        .filter((e) => e && employeeTijdslotOptions(e, dayKey).some((o) => o.start === tijd))
+        .filter((e) => e && employeeTijdslotOptions(e, dayKey, dateIso).some((o) => o.start === tijd))
         .sort((a, b) => a.naam.localeCompare(b.naam));
       const gekozen = candidates.slice(0, aantal);
       gekozen.forEach((e) => {
-        const opts = employeeTijdslotOptions(e, dayKey).filter((o) => o.start === tijd);
+        const opts = employeeTijdslotOptions(e, dayKey, dateIso).filter((o) => o.start === tijd);
         assignments[e.id] = opts.find((o) => o.eind !== "sluit") || opts[0];
         remaining.delete(e.id);
       });
@@ -1038,11 +1083,11 @@ th { color: var(--muted); font-weight: 600; }
     if (sluitersNodig > 0) {
       const candidates = Array.from(remaining)
         .map(empById)
-        .filter((e) => e && employeeTijdslotOptions(e, dayKey).some((o) => o.eind === "sluit"))
+        .filter((e) => e && employeeTijdslotOptions(e, dayKey, dateIso).some((o) => o.eind === "sluit"))
         .sort((a, b) => a.naam.localeCompare(b.naam));
       const gekozen = candidates.slice(0, sluitersNodig);
       gekozen.forEach((e) => {
-        assignments[e.id] = employeeTijdslotOptions(e, dayKey).find((o) => o.eind === "sluit");
+        assignments[e.id] = employeeTijdslotOptions(e, dayKey, dateIso).find((o) => o.eind === "sluit");
         remaining.delete(e.id);
       });
       if (gekozen.length < sluitersNodig) {
@@ -1057,7 +1102,7 @@ th { color: var(--muted); font-weight: 600; }
     remaining.forEach((id) => {
       const e = empById(id);
       if (!e) return;
-      const opts = employeeTijdslotOptions(e, dayKey);
+      const opts = employeeTijdslotOptions(e, dayKey, dateIso);
       const chosen = opts.find((o) => o.eind !== "sluit") || opts[0] || null;
       if (chosen) assignments[id] = chosen;
       else warnings.push(`${e.naam} heeft geen passende tijdoptie ingesteld voor ${dayLabel(dayKey)}.`);
@@ -1281,20 +1326,26 @@ th { color: var(--muted); font-weight: 600; }
 
   // ---------- Verlof list in the form ----------
 
+  function verlofEntryLabel(entry) {
+    if (entry.type === "vanaf") return `vanaf ${entry.tijd} vrij`;
+    if (entry.type === "tot") return `tot ${entry.tijd} vrij`;
+    return "hele dag";
+  }
+
   function renderVerlofList() {
     const ul = document.getElementById("employee-verlof-list");
     ul.innerHTML = "";
     employeeFormVerlof
       .slice()
-      .sort()
-      .forEach((dateIso) => {
+      .sort((a, b) => a.datum.localeCompare(b.datum))
+      .forEach((entry) => {
         const li = document.createElement("li");
-        li.textContent = dateIso + " ";
+        li.textContent = `${entry.datum} (${verlofEntryLabel(entry)}) `;
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
         removeBtn.textContent = "✕";
         removeBtn.addEventListener("click", () => {
-          employeeFormVerlof = employeeFormVerlof.filter((d) => d !== dateIso);
+          employeeFormVerlof = employeeFormVerlof.filter((v) => v.datum !== entry.datum);
           renderVerlofList();
         });
         li.appendChild(removeBtn);
@@ -1302,14 +1353,31 @@ th { color: var(--muted); font-weight: 600; }
       });
   }
 
+  const verlofTypeSelect = document.getElementById("employee-verlof-type");
+  const verlofTijdInput = document.getElementById("employee-verlof-tijd");
+  verlofTypeSelect.addEventListener("change", () => {
+    verlofTijdInput.hidden = verlofTypeSelect.value === "hele_dag";
+  });
+
   document.getElementById("add-verlof-btn").addEventListener("click", () => {
-    const input = document.getElementById("employee-verlof-datum");
-    if (!input.value) return;
-    if (!employeeFormVerlof.includes(input.value)) {
-      employeeFormVerlof.push(input.value);
-      renderVerlofList();
+    const datumInput = document.getElementById("employee-verlof-datum");
+    if (!datumInput.value) return;
+    const type = verlofTypeSelect.value;
+    if (type !== "hele_dag" && !verlofTijdInput.value) {
+      alert("Vul een tijdstip in voor dit gedeeltelijke verlof.");
+      return;
     }
-    input.value = "";
+    employeeFormVerlof = employeeFormVerlof.filter((v) => v.datum !== datumInput.value);
+    employeeFormVerlof.push({
+      datum: datumInput.value,
+      type,
+      tijd: type === "hele_dag" ? null : verlofTijdInput.value,
+    });
+    renderVerlofList();
+    datumInput.value = "";
+    verlofTypeSelect.value = "hele_dag";
+    verlofTijdInput.value = "";
+    verlofTijdInput.hidden = true;
   });
 
   // ---------- Employee form submit / reset ----------
@@ -1439,7 +1507,12 @@ th { color: var(--muted); font-weight: 600; }
         tr.appendChild(tdContract);
 
         const tdVerlof = document.createElement("td");
-        tdVerlof.innerHTML = emp.verlof.slice().sort().map((v) => `<span class="tag">${v}</span>`).join("") || "—";
+        tdVerlof.innerHTML =
+          emp.verlof
+            .slice()
+            .sort((a, b) => a.datum.localeCompare(b.datum))
+            .map((v) => `<span class="tag">${v.datum} (${verlofEntryLabel(v)})</span>`)
+            .join("") || "—";
         tr.appendChild(tdVerlof);
 
         const tdActions = document.createElement("td");
@@ -1742,9 +1815,12 @@ th { color: var(--muted); font-weight: 600; }
   // Bepaalt per dag wie er die dag ergens is ingepland, wijst daar (via
   // assignTijdslotenForDay) een concreet tijdslot aan toe, en telt de uren op basis
   // van de daadwerkelijk gekozen tijdopties (met "sluit" omgerekend via sluitingstijd).
-  function computeHoursForEmployeeInWeek(emp, scheduleData) {
+  function computeHoursForEmployeeInWeek(emp, scheduleData, weekValue) {
     let hours = 0;
     const schedule = scheduleData.schedule;
+    const weekDates = computeWeekDates(weekValue);
+    const dateIsoByDay = {};
+    weekDates.forEach((d) => (dateIsoByDay[d.key] = d.dateIso));
     Object.keys(schedule).forEach((dayKey) => {
       const idsToday = new Set();
       Object.keys(schedule[dayKey]).forEach((task) => {
@@ -1753,7 +1829,7 @@ th { color: var(--muted); font-weight: 600; }
         });
       });
       if (!idsToday.has(emp.id)) return;
-      const { assignments } = assignTijdslotenForDay(dayKey, Array.from(idsToday));
+      const { assignments } = assignTijdslotenForDay(dayKey, dateIsoByDay[dayKey], Array.from(idsToday));
       const opt = assignments[emp.id];
       if (opt) hours += durationHours(opt.start, opt.eind);
     });
@@ -1769,7 +1845,7 @@ th { color: var(--muted); font-weight: 600; }
     listStoredWeeksBefore(weekValue).forEach((w) => {
       const data = loadSchedule(w);
       if (!data) return;
-      saldo += computeHoursForEmployeeInWeek(emp, data) - target;
+      saldo += computeHoursForEmployeeInWeek(emp, data, w) - target;
     });
     return saldo;
   }
@@ -1807,14 +1883,15 @@ th { color: var(--muted); font-weight: 600; }
       const taskEntries = Object.entries(dayReqs).filter(([, count]) => count > 0);
 
       // Vaste medewerkers gaan altijd voor; beschikbare medewerkers vullen pas aan wat overblijft.
+      // Gedeeltelijk verlof (vanaf/tot tijdstip) sluit iemand niet uit — alleen hele-dag-verlof doet dat.
       const vastePool = (task) =>
         employees.filter(
-          (e) => e.taken.includes(task) && e.dagen[day.key] && e.dagen[day.key].type === "vast" && !e.verlof.includes(day.dateIso)
+          (e) => e.taken.includes(task) && e.dagen[day.key] && e.dagen[day.key].type === "vast" && !hasFullDayVerlof(e, day.dateIso)
         );
       const beschikbaarPool = (task) =>
         employees.filter(
           (e) =>
-            e.taken.includes(task) && e.dagen[day.key] && e.dagen[day.key].type === "beschikbaar" && !e.verlof.includes(day.dateIso)
+            e.taken.includes(task) && e.dagen[day.key] && e.dagen[day.key].type === "beschikbaar" && !hasFullDayVerlof(e, day.dateIso)
         );
       const totalPool = (task) => vastePool(task).length + beschikbaarPool(task).length;
 
@@ -1961,7 +2038,15 @@ th { color: var(--muted); font-weight: 600; }
     } else if (dagInfo.type === "beschikbaar") {
       select.classList.add("beschikbaar");
     }
-    if (dayInfo && emp.verlof.includes(dayInfo.dateIso)) select.classList.add("on-verlof");
+    if (dayInfo) {
+      const verlofEntry = verlofEntryFor(emp, dayInfo.dateIso);
+      if (verlofEntry) {
+        select.classList.add("on-verlof");
+        select.title = `Verlof: ${verlofEntryLabel(verlofEntry)}`;
+      } else {
+        select.title = "";
+      }
+    }
   }
 
   // Herberekent per dag welk tijdslot elke ingedeelde medewerker krijgt (openers/sluiters/rest)
@@ -1976,7 +2061,7 @@ th { color: var(--muted); font-weight: 600; }
           if (id) idsToday.add(id);
         });
       });
-      const { assignments } = assignTijdslotenForDay(day.key, Array.from(idsToday));
+      const { assignments } = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
       document.querySelectorAll(`.tijdslot-badge[data-day="${day.key}"]`).forEach((badge) => {
         const task = badge.dataset.task;
         const idx = Number(badge.dataset.idx);
@@ -2055,7 +2140,7 @@ th { color: var(--muted); font-weight: 600; }
       const potentieleDagen = currentWeekDates.filter(
         (day) =>
           e.dagen[day.key] &&
-          !e.verlof.includes(day.dateIso) &&
+          !hasFullDayVerlof(e, day.dateIso) &&
           e.taken.some((t) => (requirementsSnapshot[day.key] || {})[t] > 0)
       ).length;
       if (potentieleDagen >= MIN_SHIFTS_PER_WEEK) {
@@ -2072,7 +2157,7 @@ th { color: var(--muted); font-weight: 600; }
           if (id) idsToday.add(id);
         });
       });
-      const { warnings: tijdslotWarnings } = assignTijdslotenForDay(day.key, Array.from(idsToday));
+      const { warnings: tijdslotWarnings } = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
       warnings.push(...tijdslotWarnings);
     });
 
@@ -2100,7 +2185,7 @@ th { color: var(--muted); font-weight: 600; }
         const baseTarget = weeklyTargetHoursFor(emp);
         const saldoBefore = computeSaldoBeforeWeek(emp, currentWeekValue);
         const effectiveTarget = Math.max(0, Math.min(baseTarget - saldoBefore, baseTarget * 2));
-        const actual = computeHoursForEmployeeInWeek(emp, currentScheduleData);
+        const actual = computeHoursForEmployeeInWeek(emp, currentScheduleData, currentWeekValue);
         const saldoAfter = saldoBefore + (actual - baseTarget);
         const saldoClass = saldoAfter < -0.05 ? "saldo-tekort" : saldoAfter > 0.05 ? "saldo-overschot" : "";
         const tr = document.createElement("tr");
@@ -2182,8 +2267,8 @@ th { color: var(--muted); font-weight: 600; }
     const rows = weekDates.map((day) => ({
       day,
       namen: employees
-        .filter((e) => e.verlof.includes(day.dateIso))
-        .map((e) => e.naam)
+        .filter((e) => verlofEntryFor(e, day.dateIso))
+        .map((e) => `${e.naam} (${verlofEntryLabel(verlofEntryFor(e, day.dateIso))})`)
         .sort(),
     }));
 
