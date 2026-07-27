@@ -166,6 +166,33 @@ legend {
 
 .checkbox-grid input { margin: 0; width: auto; }
 
+.taken-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.taak-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.taak-uitzonderingen-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border);
+}
+
+.taak-uitzonderingen-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .fieldset-hint {
   margin: 0 0 0.7rem;
   font-size: 0.82rem;
@@ -461,6 +488,12 @@ th { color: var(--muted); font-weight: 600; }
   color: var(--secondary-dark);
 }
 
+#schedule-table select.onervaren {
+  border-color: var(--danger);
+  border-style: dashed;
+  color: var(--danger);
+}
+
 #schedule-table td.understaffed {
   background: var(--danger-bg);
 }
@@ -539,7 +572,8 @@ th { color: var(--muted); font-weight: 600; }
 
         <fieldset>
           <legend>Takenpakket</legend>
-          <div id="employee-taken" class="checkbox-grid"></div>
+          <p class="fieldset-hint">Vink de taken aan die iemand kan doen. Is iemand op sommige dagen nog niet ervaren genoeg voor een taak (bijv. wel kassa op een rustige dinsdag, maar niet op een drukke vrijdag)? Vink dan bij die taak aan op welke dagen dat (nog) niet kan — de generator houdt daar rekening mee.</p>
+          <div id="employee-taken" class="taken-list"></div>
         </fieldset>
 
         <fieldset>
@@ -922,6 +956,9 @@ th { color: var(--muted); font-weight: 600; }
   function periodTaskKey(task, period) {
     return `${task}__${period}`;
   }
+  function baseTaskKey(scheduleKey) {
+    return scheduleKey.split("__")[0];
+  }
   // Geeft, voor een taak op een dag, de groep(en) bezetting terug die daar gelden: bij een
   // gewone dag is dat er hooguit 1 (de hele dag), bij een dagdeel-dag kunnen dat er 2 zijn
   // (middagspits + avondspits) — elk met een eigen aantal en een eigen sleutel in het rooster.
@@ -971,6 +1008,15 @@ th { color: var(--muted); font-weight: 600; }
     clean.verlof = verlof;
     clean.magOpenTotSluit = !!emp.magOpenTotSluit;
     clean.nooitAlleenBij = TASKS.some((t) => t.key === emp.nooitAlleenBij) ? emp.nooitAlleenBij : null;
+    const takenUitzonderingen = {};
+    if (emp.takenUitzonderingen && typeof emp.takenUitzonderingen === "object") {
+      Object.entries(emp.takenUitzonderingen).forEach(([taskKey, dagenLijst]) => {
+        if (!TASKS.some((t) => t.key === taskKey) || !Array.isArray(dagenLijst)) return;
+        const geldigeDagen = dagenLijst.filter((d) => DAYS.some((day) => day.key === d));
+        if (geldigeDagen.length) takenUitzonderingen[taskKey] = geldigeDagen;
+      });
+    }
+    clean.takenUitzonderingen = takenUitzonderingen;
     clean.contract = {
       vast: !!contract.vast,
       uren: typeof contract.uren === "number" && contract.uren > 0 ? contract.uren : 0,
@@ -1232,18 +1278,88 @@ th { color: var(--muted); font-weight: 600; }
 
   // ---------- Employee form: build checkboxes ----------
 
-  function buildCheckboxGrid(container, items, namePrefix) {
+  // Per taak: een checkbox ("kan dit") plus een uitklapbare rij dagen ("niet op:") voor
+  // wie een taak wel kan, maar op sommige (drukkere) dagen nog niet aan zou moeten.
+  function buildTakenRows(container) {
     container.innerHTML = "";
-    items.forEach((item) => {
+    TASKS.forEach((task) => {
+      const row = document.createElement("div");
+      row.className = "taak-row";
+      row.dataset.task = task.key;
+
       const label = document.createElement("label");
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.value = item.key;
-      input.name = namePrefix;
-      label.appendChild(input);
-      label.appendChild(document.createTextNode(item.label));
-      container.appendChild(label);
+      label.className = "dag-checkbox-label";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "taken";
+      checkbox.value = task.key;
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(task.label));
+
+      const uitzonderingenBox = document.createElement("div");
+      uitzonderingenBox.className = "taak-uitzonderingen-box";
+      const hint = document.createElement("span");
+      hint.className = "taak-uitzonderingen-hint";
+      hint.textContent = "Niet op:";
+      uitzonderingenBox.appendChild(hint);
+      DAYS.forEach((day) => {
+        const dagLabel = document.createElement("label");
+        dagLabel.className = "tijdslot-option";
+        const dagCheckbox = document.createElement("input");
+        dagCheckbox.type = "checkbox";
+        dagCheckbox.value = day.key;
+        dagCheckbox.disabled = true;
+        dagLabel.appendChild(dagCheckbox);
+        dagLabel.appendChild(document.createTextNode(" " + day.label));
+        uitzonderingenBox.appendChild(dagLabel);
+      });
+
+      checkbox.addEventListener("change", () => {
+        uitzonderingenBox.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+          cb.disabled = !checkbox.checked;
+          if (!checkbox.checked) cb.checked = false;
+        });
+      });
+
+      row.appendChild(label);
+      row.appendChild(uitzonderingenBox);
+      container.appendChild(row);
     });
+  }
+
+  function getTakenData() {
+    const taken = [];
+    const takenUitzonderingen = {};
+    document.querySelectorAll("#employee-taken .taak-row").forEach((row) => {
+      const taskKey = row.dataset.task;
+      const checkbox = row.querySelector('input[name="taken"]');
+      if (!checkbox.checked) return;
+      taken.push(taskKey);
+      const uitgeslotenDagen = Array.from(
+        row.querySelectorAll('.taak-uitzonderingen-box input[type="checkbox"]:checked')
+      ).map((cb) => cb.value);
+      if (uitgeslotenDagen.length) takenUitzonderingen[taskKey] = uitgeslotenDagen;
+    });
+    return { taken, takenUitzonderingen };
+  }
+
+  function setTakenData(taken, takenUitzonderingen) {
+    const takenArr = taken || [];
+    document.querySelectorAll("#employee-taken .taak-row").forEach((row) => {
+      const taskKey = row.dataset.task;
+      const checkbox = row.querySelector('input[name="taken"]');
+      const checked = takenArr.includes(taskKey);
+      checkbox.checked = checked;
+      const excludedDays = new Set(checked && takenUitzonderingen ? takenUitzonderingen[taskKey] || [] : []);
+      row.querySelectorAll('.taak-uitzonderingen-box input[type="checkbox"]').forEach((cb) => {
+        cb.disabled = !checked;
+        cb.checked = checked && excludedDays.has(cb.value);
+      });
+    });
+  }
+
+  function isTaakUitgeslotenOpDag(emp, task, dayKey) {
+    return !!(emp.takenUitzonderingen && emp.takenUitzonderingen[task] && emp.takenUitzonderingen[task].includes(dayKey));
   }
 
   function buildDagenRows(container, items, groupName) {
@@ -1340,7 +1456,7 @@ th { color: var(--muted); font-weight: 600; }
     setTijdslotenBoxEnabled(otherBox, false);
   }
 
-  buildCheckboxGrid(document.getElementById("employee-taken"), TASKS, "taken");
+  buildTakenRows(document.getElementById("employee-taken"));
   const vasteDagenContainer = document.getElementById("employee-vaste-dagen");
   const beschikbaarDagenContainer = document.getElementById("employee-beschikbaar-dagen");
   const magOpenTotSluitCheckbox = document.getElementById("employee-mag-open-tot-sluit");
@@ -1356,15 +1472,6 @@ th { color: var(--muted); font-weight: 600; }
   }
   function setNooitAlleenBij(taskKey) {
     nooitAlleenBijSelect.value = taskKey || "";
-  }
-
-  function getCheckedValues(name) {
-    return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((el) => el.value);
-  }
-  function setCheckedValues(name, values) {
-    document.querySelectorAll(`input[name="${name}"]`).forEach((el) => {
-      el.checked = values.includes(el.value);
-    });
   }
 
   function getMagOpenTotSluit() {
@@ -1525,7 +1632,7 @@ th { color: var(--muted); font-weight: 600; }
     editingEmployeeId = null;
     employeeFormVerlof = [];
     document.getElementById("employee-form").reset();
-    setCheckedValues("taken", []);
+    setTakenData([], {});
     setMagOpenTotSluit(false);
     setNooitAlleenBij(null);
     setDagenData({});
@@ -1539,7 +1646,7 @@ th { color: var(--muted); font-weight: 600; }
     e.preventDefault();
     const naam = document.getElementById("employee-naam").value.trim();
     if (!naam) return;
-    const taken = getCheckedValues("taken");
+    const { taken, takenUitzonderingen } = getTakenData();
     const magOpenTotSluit = getMagOpenTotSluit();
     const nooitAlleenBij = getNooitAlleenBij();
     const dagen = getDagenData();
@@ -1549,6 +1656,7 @@ th { color: var(--muted); font-weight: 600; }
       const emp = employees.find((e) => e.id === editingEmployeeId);
       emp.naam = naam;
       emp.taken = taken;
+      emp.takenUitzonderingen = takenUitzonderingen;
       emp.magOpenTotSluit = magOpenTotSluit;
       emp.nooitAlleenBij = nooitAlleenBij;
       emp.dagen = dagen;
@@ -1559,6 +1667,7 @@ th { color: var(--muted); font-weight: 600; }
         id: uid(),
         naam,
         taken,
+        takenUitzonderingen,
         magOpenTotSluit,
         nooitAlleenBij,
         dagen,
@@ -1579,7 +1688,7 @@ th { color: var(--muted); font-weight: 600; }
     editingEmployeeId = id;
     employeeFormVerlof = emp.verlof.slice();
     document.getElementById("employee-naam").value = emp.naam;
-    setCheckedValues("taken", emp.taken);
+    setTakenData(emp.taken, emp.takenUitzonderingen);
     setMagOpenTotSluit(emp.magOpenTotSluit);
     setNooitAlleenBij(emp.nooitAlleenBij);
     setDagenData(emp.dagen);
@@ -1620,7 +1729,13 @@ th { color: var(--muted); font-weight: 600; }
 
         const tdTaken = document.createElement("td");
         tdTaken.innerHTML =
-          emp.taken.map((t) => `<span class="tag">${taskLabel(t)}</span>`).join("") +
+          emp.taken
+            .map((t) => {
+              const uitgesloten = (emp.takenUitzonderingen && emp.takenUitzonderingen[t]) || [];
+              const suffix = uitgesloten.length ? ` (niet op: ${uitgesloten.map(dayLabel).join(", ")})` : "";
+              return `<span class="tag">${taskLabel(t)}${suffix}</span>`;
+            })
+            .join("") +
             (emp.nooitAlleenBij ? `<span class="tag tag-beschikbaar">nooit alleen: ${taskLabel(emp.nooitAlleenBij)}</span>` : "") ||
           "—";
         tr.appendChild(tdTaken);
@@ -2092,6 +2207,7 @@ th { color: var(--muted); font-weight: 600; }
         chosenSoFar.some((c) => pairs.some((p) => p.includes(c.id) && p.includes(candidate.id)));
       const eligible = (e) =>
         e.taken.includes(task) &&
+        !isTaakUitgeslotenOpDag(e, task, day.key) &&
         e.dagen[day.key] &&
         !hasFullDayVerlof(e, day.dateIso) &&
         !excludeIds.has(e.id) &&
@@ -2185,7 +2301,9 @@ th { color: var(--muted); font-weight: 600; }
       } else {
         const taskEntries = Object.entries(dayReqs).filter(([, count]) => count > 0);
         const totalPool = (task) =>
-          employees.filter((e) => e.taken.includes(task) && e.dagen[day.key] && !hasFullDayVerlof(e, day.dateIso)).length;
+          employees.filter(
+            (e) => e.taken.includes(task) && !isTaakUitgeslotenOpDag(e, task, day.key) && e.dagen[day.key] && !hasFullDayVerlof(e, day.dateIso)
+          ).length;
         // Meest schaarse taak (minste kandidaten t.o.v. behoefte) eerst toewijzen.
         taskEntries.sort((a, b) => (totalPool(a[0]) - a[1]) - (totalPool(b[0]) - b[1]));
 
@@ -2284,7 +2402,7 @@ th { color: var(--muted); font-weight: 600; }
   function applySelectWarningClass(select) {
     const day = select.dataset.day;
     const empId = select.value;
-    select.classList.remove("not-fixed-day", "on-verlof", "beschikbaar");
+    select.classList.remove("not-fixed-day", "on-verlof", "beschikbaar", "onervaren");
     if (!empId) return;
     const emp = employees.find((e) => e.id === empId);
     if (!emp) return;
@@ -2294,6 +2412,9 @@ th { color: var(--muted); font-weight: 600; }
       select.classList.add("not-fixed-day");
     } else if (dagInfo.type === "beschikbaar") {
       select.classList.add("beschikbaar");
+    }
+    if (isTaakUitgeslotenOpDag(emp, baseTaskKey(select.dataset.task), day)) {
+      select.classList.add("onervaren");
     }
     if (dayInfo) {
       const verlofEntry = verlofEntryFor(emp, dayInfo.dateIso);
@@ -2440,6 +2561,22 @@ th { color: var(--muted); font-weight: 600; }
             const suffix = group.label ? ` (${group.label})` : "";
             warnings.push(
               `${e.naam} staat op ${day.label}${suffix} alleen bij ${taskLabel(e.nooitAlleenBij)} — moet samen met iemand anders staan.`
+            );
+          }
+        });
+      });
+    });
+
+    // Handmatig ingepland op een taak/dag waarvoor deze medewerker (nog) niet ervaren genoeg is.
+    currentWeekDates.forEach((day) => {
+      Object.keys(schedule[day.key] || {}).forEach((scheduleKey) => {
+        const task = baseTaskKey(scheduleKey);
+        (schedule[day.key][scheduleKey] || []).forEach((id) => {
+          if (!id) return;
+          const emp = employees.find((e) => e.id === id);
+          if (emp && isTaakUitgeslotenOpDag(emp, task, day.key)) {
+            warnings.push(
+              `${emp.naam} staat op ${day.label} bij ${taskLabel(task)}, maar is daar op die dag (nog) niet ervaren genoeg voor.`
             );
           }
         });
