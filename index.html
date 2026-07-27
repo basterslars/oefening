@@ -251,12 +251,23 @@ legend {
 
 .verlof-input-row {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
+  gap: 0.9rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
   margin-bottom: 0.6rem;
 }
 
 .verlof-input-row input { margin: 0; }
+
+.verlof-inline-label {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.verlof-inline-label input, .verlof-inline-label select {
+  margin-top: 0.2rem;
+  max-width: 150px;
+}
 
 .verlof-list {
   list-style: none;
@@ -508,6 +519,15 @@ th { color: var(--muted); font-weight: 600; }
         </fieldset>
 
         <fieldset>
+          <legend>Leidinggevende</legend>
+          <p class="fieldset-hint">Voor bijv. een leidinggevende die overzicht houdt en af en toe moet kunnen bijspringen: kies een taak waarop deze persoon nooit als enige mag staan (er moet dan altijd nog iemand anders bij staan).</p>
+          <label>
+            Nooit alleen bij taak
+            <select id="employee-nooit-alleen-bij"></select>
+          </label>
+        </fieldset>
+
+        <fieldset>
           <legend>Vaste werkdagen</legend>
           <p class="fieldset-hint">Dagen waarop iemand altijd staat ingepland. Vink een dag aan en kies daarna een of meer tijdopties waarop deze persoon die dag inzetbaar is (zie Bezetting-tab om de opties per dag aan te passen).</p>
           <div id="employee-vaste-dagen" class="dagen-list"></div>
@@ -542,16 +562,32 @@ th { color: var(--muted); font-weight: 600; }
         </fieldset>
 
         <fieldset>
-          <legend>Verlof aangevraagd (specifieke data)</legend>
-          <p class="fieldset-hint">Vrij vragen kan voor de hele dag, of voor een deel ervan (bijv. "vanaf 16:30 vrij" — kan dan die dag nog wel tot 16:30 werken).</p>
+          <legend>Verlof aangevraagd</legend>
+          <p class="fieldset-hint">
+            Vrij vragen kan voor één dag of voor een hele periode (vul ook "t/m" in voor bijv. een week vrij), en per
+            dag voor de hele dag of een deel ervan (bijv. "vanaf 16:30 vrij" — kan dan die dag nog wel tot 16:30 werken).
+          </p>
           <div class="verlof-input-row">
-            <input type="date" id="employee-verlof-datum">
-            <select id="employee-verlof-type">
-              <option value="hele_dag">Hele dag</option>
-              <option value="vanaf">Vanaf tijdstip vrij</option>
-              <option value="tot">Tot tijdstip vrij</option>
-            </select>
-            <input type="time" id="employee-verlof-tijd" hidden>
+            <label class="verlof-inline-label">
+              Van
+              <input type="date" id="employee-verlof-datum">
+            </label>
+            <label class="verlof-inline-label">
+              T/m (optioneel, voor een periode)
+              <input type="date" id="employee-verlof-datum-tot">
+            </label>
+            <label class="verlof-inline-label">
+              Type
+              <select id="employee-verlof-type">
+                <option value="hele_dag">Hele dag</option>
+                <option value="vanaf">Vanaf tijdstip vrij</option>
+                <option value="tot">Tot tijdstip vrij</option>
+              </select>
+            </label>
+            <label class="verlof-inline-label">
+              Tijdstip
+              <input type="time" id="employee-verlof-tijd" hidden>
+            </label>
             <button type="button" id="add-verlof-btn" class="btn-secondary">+ Toevoegen</button>
           </div>
           <ul id="employee-verlof-list" class="verlof-list"></ul>
@@ -769,18 +805,24 @@ th { color: var(--muted); font-weight: 600; }
   // Zaterdag is een aanname (zelfde patroon als woensdag); via Bezetting > Openen & sluiten aan te passen.
   const DEFAULT_OPEN_SLUIT = {
     dinsdag: {
-      tijdsloten: ["14:00 - sluit", "14:00 - 19:30", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
+      tijdsloten: [
+        "14:00 - sluit", "14:00 - 19:30", "16:30 - 19:30",
+        "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
+      ],
       openers: [{ tijd: "14:00", aantal: 2 }],
       sluiters: 4,
     },
     woensdag: {
-      tijdsloten: ["10:30 - 19:30", "10:30 - sluit", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
+      tijdsloten: [
+        "10:30 - 19:30", "10:30 - sluit", "16:30 - 19:30",
+        "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
+      ],
       openers: [{ tijd: "10:30", aantal: 2 }],
       sluiters: 4,
     },
     donderdag: {
       tijdsloten: [
-        "10:30 - 19:30", "10:30 - sluit", "14:00 - sluit", "14:00 - 20:00",
+        "10:30 - 19:30", "10:30 - sluit", "14:00 - sluit", "14:00 - 20:00", "16:30 - 19:30",
         "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
       ],
       openers: [{ tijd: "10:30", aantal: 2 }],
@@ -863,6 +905,7 @@ th { color: var(--muted); font-weight: 600; }
     clean.dagen = dagen;
     clean.verlof = verlof;
     clean.magOpenTotSluit = !!emp.magOpenTotSluit;
+    clean.nooitAlleenBij = TASKS.some((t) => t.key === emp.nooitAlleenBij) ? emp.nooitAlleenBij : null;
     clean.contract = {
       vast: !!contract.vast,
       uren: typeof contract.uren === "number" && contract.uren > 0 ? contract.uren : 0,
@@ -1240,6 +1283,16 @@ th { color: var(--muted); font-weight: 600; }
   buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
   magOpenTotSluitCheckbox.addEventListener("change", refreshAllOpenTotSluitRestrictions);
 
+  const nooitAlleenBijSelect = document.getElementById("employee-nooit-alleen-bij");
+  nooitAlleenBijSelect.innerHTML =
+    '<option value="">Geen</option>' + TASKS.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+  function getNooitAlleenBij() {
+    return nooitAlleenBijSelect.value || null;
+  }
+  function setNooitAlleenBij(taskKey) {
+    nooitAlleenBijSelect.value = taskKey || "";
+  }
+
   function getCheckedValues(name) {
     return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((el) => el.value);
   }
@@ -1359,22 +1412,43 @@ th { color: var(--muted); font-weight: 600; }
     verlofTijdInput.hidden = verlofTypeSelect.value === "hele_dag";
   });
 
+  // Alle datums van "van" t/m "tot" (beide inclusief); zonder "tot" is dat gewoon de ene datum.
+  function datesInRange(vanDatum, totDatum) {
+    const datums = [];
+    let cursor = new Date(vanDatum + "T00:00:00Z");
+    const eind = new Date((totDatum || vanDatum) + "T00:00:00Z");
+    while (cursor <= eind) {
+      datums.push(cursor.toISOString().slice(0, 10));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return datums;
+  }
+
   document.getElementById("add-verlof-btn").addEventListener("click", () => {
     const datumInput = document.getElementById("employee-verlof-datum");
+    const datumTotInput = document.getElementById("employee-verlof-datum-tot");
     if (!datumInput.value) return;
+    if (datumTotInput.value && datumTotInput.value < datumInput.value) {
+      alert('"T/m" moet op of na de "van"-datum liggen.');
+      return;
+    }
     const type = verlofTypeSelect.value;
     if (type !== "hele_dag" && !verlofTijdInput.value) {
       alert("Vul een tijdstip in voor dit gedeeltelijke verlof.");
       return;
     }
-    employeeFormVerlof = employeeFormVerlof.filter((v) => v.datum !== datumInput.value);
-    employeeFormVerlof.push({
-      datum: datumInput.value,
-      type,
-      tijd: type === "hele_dag" ? null : verlofTijdInput.value,
+    const datums = datesInRange(datumInput.value, datumTotInput.value);
+    if (datums.length > 60) {
+      alert("Die periode is langer dan 60 dagen — controleer de data.");
+      return;
+    }
+    datums.forEach((datum) => {
+      employeeFormVerlof = employeeFormVerlof.filter((v) => v.datum !== datum);
+      employeeFormVerlof.push({ datum, type, tijd: type === "hele_dag" ? null : verlofTijdInput.value });
     });
     renderVerlofList();
     datumInput.value = "";
+    datumTotInput.value = "";
     verlofTypeSelect.value = "hele_dag";
     verlofTijdInput.value = "";
     verlofTijdInput.hidden = true;
@@ -1388,6 +1462,7 @@ th { color: var(--muted); font-weight: 600; }
     document.getElementById("employee-form").reset();
     setCheckedValues("taken", []);
     setMagOpenTotSluit(false);
+    setNooitAlleenBij(null);
     setDagenData({});
     setContractData(null);
     renderVerlofList();
@@ -1401,6 +1476,7 @@ th { color: var(--muted); font-weight: 600; }
     if (!naam) return;
     const taken = getCheckedValues("taken");
     const magOpenTotSluit = getMagOpenTotSluit();
+    const nooitAlleenBij = getNooitAlleenBij();
     const dagen = getDagenData();
     const contract = getContractData();
 
@@ -1409,6 +1485,7 @@ th { color: var(--muted); font-weight: 600; }
       emp.naam = naam;
       emp.taken = taken;
       emp.magOpenTotSluit = magOpenTotSluit;
+      emp.nooitAlleenBij = nooitAlleenBij;
       emp.dagen = dagen;
       emp.contract = contract;
       emp.verlof = employeeFormVerlof.slice();
@@ -1418,6 +1495,7 @@ th { color: var(--muted); font-weight: 600; }
         naam,
         taken,
         magOpenTotSluit,
+        nooitAlleenBij,
         dagen,
         contract,
         verlof: employeeFormVerlof.slice(),
@@ -1438,6 +1516,7 @@ th { color: var(--muted); font-weight: 600; }
     document.getElementById("employee-naam").value = emp.naam;
     setCheckedValues("taken", emp.taken);
     setMagOpenTotSluit(emp.magOpenTotSluit);
+    setNooitAlleenBij(emp.nooitAlleenBij);
     setDagenData(emp.dagen);
     setContractData(emp.contract);
     renderVerlofList();
@@ -1475,7 +1554,10 @@ th { color: var(--muted); font-weight: 600; }
         tr.appendChild(tdNaam);
 
         const tdTaken = document.createElement("td");
-        tdTaken.innerHTML = emp.taken.map((t) => `<span class="tag">${taskLabel(t)}</span>`).join("") || "—";
+        tdTaken.innerHTML =
+          emp.taken.map((t) => `<span class="tag">${taskLabel(t)}</span>`).join("") +
+            (emp.nooitAlleenBij ? `<span class="tag tag-beschikbaar">nooit alleen: ${taskLabel(emp.nooitAlleenBij)}</span>` : "") ||
+          "—";
         tr.appendChild(tdTaken);
 
         const tdDagen = document.createElement("td");
@@ -2159,6 +2241,19 @@ th { color: var(--muted); font-weight: 600; }
       });
       const { warnings: tijdslotWarnings } = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
       warnings.push(...tijdslotWarnings);
+    });
+
+    // Leidinggevenden (bijv. Roeland) die nooit alleen op een taak mogen staan.
+    employees.forEach((e) => {
+      if (!e.nooitAlleenBij) return;
+      currentWeekDates.forEach((day) => {
+        const ids = (schedule[day.key][e.nooitAlleenBij] || []).filter((id) => id);
+        if (ids.includes(e.id) && ids.length === 1) {
+          warnings.push(
+            `${e.naam} staat op ${day.label} alleen bij ${taskLabel(e.nooitAlleenBij)} — moet samen met iemand anders staan.`
+          );
+        }
+      });
     });
 
     return warnings;
