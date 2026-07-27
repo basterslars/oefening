@@ -172,6 +172,25 @@ legend {
   color: var(--muted);
 }
 
+.dagen-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 700px) {
+  .dagen-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dagen-columns fieldset {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
 .dagen-list {
   display: flex;
   flex-direction: column;
@@ -180,7 +199,7 @@ legend {
 
 .dag-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.9rem;
   flex-wrap: wrap;
 }
@@ -527,17 +546,18 @@ th { color: var(--muted); font-weight: 600; }
           </label>
         </fieldset>
 
-        <fieldset>
-          <legend>Vaste werkdagen</legend>
-          <p class="fieldset-hint">Dagen waarop iemand altijd staat ingepland. Vink een dag aan en kies daarna een of meer tijdopties waarop deze persoon die dag inzetbaar is (zie Bezetting-tab om de opties per dag aan te passen).</p>
-          <div id="employee-vaste-dagen" class="dagen-list"></div>
-        </fieldset>
+        <p class="fieldset-hint">Vink per dag aan of iemand vast werkt of alleen beschikbaar is (nooit allebei voor dezelfde dag), en kies daarna een of meer tijdopties (zie Bezetting-tab om de opties per dag aan te passen). De twee kolommen hieronder vul je gewoon naast elkaar in — vaste dagen in de linkerkolom, de overige beschikbare dagen in de rechter.</p>
+        <div class="dagen-columns">
+          <fieldset>
+            <legend>Vaste werkdagen</legend>
+            <div id="employee-vaste-dagen" class="dagen-list"></div>
+          </fieldset>
 
-        <fieldset>
-          <legend>Beschikbaar om te werken</legend>
-          <p class="fieldset-hint">Extra dagen waarop iemand ingezet kan worden als het nodig is, maar niet standaard wordt ingepland. Een dag kan niet tegelijk vast én beschikbaar zijn.</p>
-          <div id="employee-beschikbaar-dagen" class="dagen-list"></div>
-        </fieldset>
+          <fieldset>
+            <legend>Beschikbaar om te werken</legend>
+            <div id="employee-beschikbaar-dagen" class="dagen-list"></div>
+          </fieldset>
+        </div>
 
         <fieldset>
           <legend>Vast contract</legend>
