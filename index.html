@@ -469,6 +469,19 @@ th { color: var(--muted); font-weight: 600; }
   color: var(--muted);
 }
 
+.period-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--secondary-dark);
+  margin: 0.3rem 0 0.2rem;
+}
+
+.period-label:first-child {
+  margin-top: 0;
+}
+
 .tijdslot-badge {
   font-size: 0.78rem;
   color: var(--muted);
@@ -710,6 +723,8 @@ th { color: var(--muted); font-weight: 600; }
         <h2>Benodigde bezetting per dag</h2>
         <button id="reset-requirements-btn" class="btn-secondary">Herstel standaard</button>
       </div>
+      <p class="fieldset-hint">Een dag met een omslagtijd hieronder is opgesplitst in middagspits en avondspits, elk met een eigen bezetting per taak.</p>
+      <div id="requirements-omslag-area"></div>
       <div class="table-scroll">
         <table id="requirements-table">
           <thead>
@@ -811,11 +826,17 @@ th { color: var(--muted); font-weight: 600; }
     { key: "zondag", label: "Zondag", jsDay: 0 },
   ];
 
+  // Vrijdag is opgesplitst in middagspits/avondspits met een eigen bezetting per periode
+  // (in plaats van één aantal per taak voor de hele dag). Zie isPeriodDag()/getCellGroups().
   const DEFAULT_REQUIREMENTS = {
     dinsdag: { kassa: 1, snack: 1, friet: 1, bakplaat: 1, vliegende_keep: 1, fietsbezorgen: 2 },
     woensdag: { kassa: 1, snack: 1, friet: 1, bakplaat: 1, vliegende_keep: 1, fietsbezorgen: 2 },
     donderdag: { kassa: 2, bakplaat: 2, friet: 1, snack: 1, fietsbezorgen: 2 },
-    vrijdag: { kassa: 2, friet: 1, snack: 1, bakplaat: 2, fietsbezorgen: 3, autobezorgen: 1 },
+    vrijdag: {
+      omslag: "16:30",
+      middag: { kassa: 1, friet: 1, snack: 1, bakplaat: 1, vliegende_keep: 1 },
+      avond: { kassa: 2, friet: 1, snack: 1, bakplaat: 2, fietsbezorgen: 3, autobezorgen: 1 },
+    },
     zaterdag: { kassa: 2, bakplaat: 2, snack: 1, friet: 1, fietsbezorgen: 3 },
     zondag: { kassa: 2, bakplaat: 2, friet: 1, snack: 1, fietsbezorgen: 3, autobezorgen: 1 },
   };
@@ -891,6 +912,30 @@ th { color: var(--muted); font-weight: 600; }
   function dayLabel(key) {
     const d = DAYS.find((d) => d.key === key);
     return d ? d.label : key;
+  }
+
+  // Een "dagdeel-dag" (zoals vrijdag) heeft een eigen bezetting per periode (middag/avond)
+  // in plaats van één aantal per taak voor de hele dag.
+  function isPeriodDag(dayReqs) {
+    return !!(dayReqs && (dayReqs.middag || dayReqs.avond));
+  }
+  function periodTaskKey(task, period) {
+    return `${task}__${period}`;
+  }
+  // Geeft, voor een taak op een dag, de groep(en) bezetting terug die daar gelden: bij een
+  // gewone dag is dat er hooguit 1 (de hele dag), bij een dagdeel-dag kunnen dat er 2 zijn
+  // (middagspits + avondspits) — elk met een eigen aantal en een eigen sleutel in het rooster.
+  function getCellGroups(dayReqs, taskKey) {
+    if (isPeriodDag(dayReqs)) {
+      const groups = [];
+      const m = (dayReqs.middag || {})[taskKey] || 0;
+      const a = (dayReqs.avond || {})[taskKey] || 0;
+      if (m > 0) groups.push({ period: "middag", label: "Middagspits", count: m, scheduleKey: periodTaskKey(taskKey, "middag") });
+      if (a > 0) groups.push({ period: "avond", label: "Avondspits", count: a, scheduleKey: periodTaskKey(taskKey, "avond") });
+      return groups;
+    }
+    const count = (dayReqs || {})[taskKey] || 0;
+    return count > 0 ? [{ period: null, label: null, count, scheduleKey: taskKey }] : [];
   }
 
   // ---------- Storage helpers ----------
@@ -1694,10 +1739,41 @@ th { color: var(--muted); font-weight: 600; }
 
   // ---------- Bezetting (requirements) tab ----------
 
+  // Dagen met een omslagtijd worden als 2 kolommen getoond (middagspits/avondspits);
+  // gewone dagen blijven 1 kolom.
+  function requirementsColumns() {
+    const cols = [];
+    DAYS.forEach((day) => {
+      if (isPeriodDag(requirements[day.key])) {
+        cols.push({ dayKey: day.key, period: "middag", label: `${day.label}<br><small>middagspits</small>` });
+        cols.push({ dayKey: day.key, period: "avond", label: `${day.label}<br><small>avondspits</small>` });
+      } else {
+        cols.push({ dayKey: day.key, period: null, label: day.label });
+      }
+    });
+    return cols;
+  }
+  function requirementsInputId(col, taskKey) {
+    return `req-${col.dayKey}-${col.period || "dag"}-${taskKey}`;
+  }
+
+  function renderRequirementsOmslagInputs() {
+    const area = document.getElementById("requirements-omslag-area");
+    area.innerHTML = "";
+    DAYS.filter((day) => isPeriodDag(requirements[day.key])).forEach((day) => {
+      const label = document.createElement("label");
+      label.className = "contract-fields";
+      label.innerHTML = `Omslagtijd middag/avond op ${day.label}
+        <input type="time" id="omslag-${day.key}" value="${requirements[day.key].omslag || "16:30"}">`;
+      area.appendChild(label);
+    });
+  }
+
   function renderRequirementsTable() {
     const table = document.getElementById("requirements-table");
+    const cols = requirementsColumns();
     const thead = table.querySelector("thead tr");
-    thead.innerHTML = "<th>Taak</th>" + DAYS.map((d) => `<th>${d.label}</th>`).join("");
+    thead.innerHTML = "<th>Taak</th>" + cols.map((c) => `<th>${c.label}</th>`).join("");
 
     const tbody = document.createElement("tbody");
     TASKS.forEach((task) => {
@@ -1705,13 +1781,14 @@ th { color: var(--muted); font-weight: 600; }
       const tdLabel = document.createElement("td");
       tdLabel.textContent = task.label;
       tr.appendChild(tdLabel);
-      DAYS.forEach((day) => {
+      cols.forEach((col) => {
         const td = document.createElement("td");
         const input = document.createElement("input");
         input.type = "number";
         input.min = "0";
-        input.id = `req-${day.key}-${task.key}`;
-        input.value = (requirements[day.key] && requirements[day.key][task.key]) || 0;
+        input.id = requirementsInputId(col, task.key);
+        const dayReqs = requirements[col.dayKey] || {};
+        input.value = col.period ? (dayReqs[col.period] || {})[task.key] || 0 : dayReqs[task.key] || 0;
         td.appendChild(input);
         tr.appendChild(td);
       });
@@ -1719,16 +1796,31 @@ th { color: var(--muted); font-weight: 600; }
     });
     table.querySelector("tbody")?.remove();
     table.appendChild(tbody);
+
+    renderRequirementsOmslagInputs();
   }
 
   document.getElementById("save-requirements-btn").addEventListener("click", () => {
     const newReqs = {};
     DAYS.forEach((day) => {
-      newReqs[day.key] = {};
-      TASKS.forEach((task) => {
-        const val = parseInt(document.getElementById(`req-${day.key}-${task.key}`).value, 10) || 0;
-        if (val > 0) newReqs[day.key][task.key] = val;
-      });
+      if (isPeriodDag(requirements[day.key])) {
+        const middag = {};
+        const avond = {};
+        TASKS.forEach((task) => {
+          const mVal = parseInt(document.getElementById(requirementsInputId({ dayKey: day.key, period: "middag" }, task.key)).value, 10) || 0;
+          if (mVal > 0) middag[task.key] = mVal;
+          const aVal = parseInt(document.getElementById(requirementsInputId({ dayKey: day.key, period: "avond" }, task.key)).value, 10) || 0;
+          if (aVal > 0) avond[task.key] = aVal;
+        });
+        const omslagInput = document.getElementById(`omslag-${day.key}`);
+        newReqs[day.key] = { omslag: (omslagInput && omslagInput.value) || "16:30", middag, avond };
+      } else {
+        newReqs[day.key] = {};
+        TASKS.forEach((task) => {
+          const val = parseInt(document.getElementById(requirementsInputId({ dayKey: day.key, period: null }, task.key)).value, 10) || 0;
+          if (val > 0) newReqs[day.key][task.key] = val;
+        });
+      }
     });
     requirements = newReqs;
     saveRequirements(requirements);
@@ -1974,85 +2066,144 @@ th { color: var(--muted); font-weight: 600; }
         effectiveTargetShifts[e.id] = adjustedHours / gemiddeldeUren;
       }
     });
-    const schedule = {};
-    const warnings = [];
 
-    weekDates.forEach((day) => {
-      const dayReqs = reqs[day.key] || {};
-      const assignedToday = new Set();
-      schedule[day.key] = {};
+    // Wie nog onder het minimum van 2 diensten zit, of wie (bij een vast contract) nog
+    // niet aan het (voor eerdere over/onderschotten gecorrigeerde, geschatte) aantal
+    // diensten zit, krijgt voorrang boven mensen die al genoeg hebben. Binnen die
+    // groepen geldt eerlijke verdeling op basis van aantal diensten tot nu toe.
+    const needsMore = (e) => {
+      if (effectiveTargetShifts[e.id] !== null) return shiftCount[e.id] < effectiveTargetShifts[e.id];
+      return shiftCount[e.id] < MIN_SHIFTS_PER_WEEK;
+    };
+    const byPriority = (a, b) => {
+      const tierA = needsMore(a) ? 0 : 1;
+      const tierB = needsMore(b) ? 0 : 1;
+      if (tierA !== tierB) return tierA - tierB;
+      return shiftCount[a.id] - shiftCount[b.id] || a.naam.localeCompare(b.naam);
+    };
 
-      const taskEntries = Object.entries(dayReqs).filter(([, count]) => count > 0);
+    // Kiest kandidaten voor een taak/dag, met voorrang zoals hierboven, verboden koppels
+    // vermeden, en optioneel een extra geschiktheidscheck (bijv. "kan die dag voor 16:30
+    // beginnen") voor het dagdeel-scenario hieronder. Gedeeltelijk verlof (vanaf/tot
+    // tijdstip) sluit iemand niet bij voorbaat uit — alleen hele-dag-verlof doet dat.
+    function pickCandidates(day, task, count, excludeIds, extraEligibleFn) {
+      const pairs = forbiddenPairs[task] || [];
+      const conflicts = (candidate, chosenSoFar) =>
+        chosenSoFar.some((c) => pairs.some((p) => p.includes(c.id) && p.includes(candidate.id)));
+      const eligible = (e) =>
+        e.taken.includes(task) &&
+        e.dagen[day.key] &&
+        !hasFullDayVerlof(e, day.dateIso) &&
+        !excludeIds.has(e.id) &&
+        (!extraEligibleFn || extraEligibleFn(e));
 
-      // Vaste medewerkers gaan altijd voor; beschikbare medewerkers vullen pas aan wat overblijft.
-      // Gedeeltelijk verlof (vanaf/tot tijdstip) sluit iemand niet uit — alleen hele-dag-verlof doet dat.
-      const vastePool = (task) =>
-        employees.filter(
-          (e) => e.taken.includes(task) && e.dagen[day.key] && e.dagen[day.key].type === "vast" && !hasFullDayVerlof(e, day.dateIso)
-        );
-      const beschikbaarPool = (task) =>
-        employees.filter(
-          (e) =>
-            e.taken.includes(task) && e.dagen[day.key] && e.dagen[day.key].type === "beschikbaar" && !hasFullDayVerlof(e, day.dateIso)
-        );
-      const totalPool = (task) => vastePool(task).length + beschikbaarPool(task).length;
+      const vasteCandidates = employees.filter((e) => eligible(e) && e.dagen[day.key].type === "vast").sort(byPriority);
+      const beschikbaarCandidates = employees
+        .filter((e) => eligible(e) && e.dagen[day.key].type === "beschikbaar")
+        .sort(byPriority);
 
-      // Meest schaarse taak (minste kandidaten t.o.v. behoefte) eerst toewijzen.
-      taskEntries.sort((a, b) => {
-        const scarcityA = totalPool(a[0]) - a[1];
-        const scarcityB = totalPool(b[0]) - b[1];
-        return scarcityA - scarcityB;
-      });
-
-      // Wie nog onder het minimum van 2 diensten zit, of wie (bij een vast contract) nog
-      // niet aan het (voor eerdere over/onderschotten gecorrigeerde, geschatte) aantal
-      // diensten zit, krijgt voorrang boven mensen die al genoeg hebben. Binnen die
-      // groepen geldt eerlijke verdeling op basis van aantal diensten tot nu toe.
-      const needsMore = (e) => {
-        if (effectiveTargetShifts[e.id] !== null) return shiftCount[e.id] < effectiveTargetShifts[e.id];
-        return shiftCount[e.id] < MIN_SHIFTS_PER_WEEK;
-      };
-      const byPriority = (a, b) => {
-        const tierA = needsMore(a) ? 0 : 1;
-        const tierB = needsMore(b) ? 0 : 1;
-        if (tierA !== tierB) return tierA - tierB;
-        return shiftCount[a.id] - shiftCount[b.id] || a.naam.localeCompare(b.naam);
-      };
-
-      taskEntries.forEach(([task, count]) => {
-        const notAssigned = (e) => !assignedToday.has(e.id);
-        const pairs = forbiddenPairs[task] || [];
-        const conflicts = (candidate, chosenSoFar) =>
-          chosenSoFar.some((c) => pairs.some((p) => p.includes(c.id) && p.includes(candidate.id)));
-
-        const chosen = [];
-        const vasteCandidates = vastePool(task).filter(notAssigned).sort(byPriority);
-        for (const cand of vasteCandidates) {
+      const chosen = [];
+      for (const cand of vasteCandidates) {
+        if (chosen.length >= count) break;
+        if (conflicts(cand, chosen)) continue;
+        chosen.push(cand);
+      }
+      if (chosen.length < count) {
+        for (const cand of beschikbaarCandidates) {
           if (chosen.length >= count) break;
           if (conflicts(cand, chosen)) continue;
           chosen.push(cand);
         }
-        if (chosen.length < count) {
-          const beschikbaarCandidates = beschikbaarPool(task).filter(notAssigned).sort(byPriority);
-          for (const cand of beschikbaarCandidates) {
-            if (chosen.length >= count) break;
-            if (conflicts(cand, chosen)) continue;
-            chosen.push(cand);
+      }
+      return chosen;
+    }
+
+    const schedule = {};
+    const warnings = [];
+
+    weekDates.forEach((day) => {
+      schedule[day.key] = {};
+      const dayReqs = reqs[day.key] || {};
+
+      if (isPeriodDag(dayReqs)) {
+        const cutoff = timeToMinutes(dayReqs.omslag || "16:30");
+        // Per medewerker het taak waarop die dag al is ingedeeld (over beide periodes heen) —
+        // iemand mag voor dezelfde taak in beide periodes meetellen (één lange dienst dekt
+        // dan allebei), maar niet voor twee verschillende taken op dezelfde dag.
+        const assignedTaskToday = {};
+        const relevantTasks = TASKS.filter(
+          (t) => (dayReqs.middag && dayReqs.middag[t.key] > 0) || (dayReqs.avond && dayReqs.avond[t.key] > 0)
+        );
+
+        relevantTasks.forEach((taskDef) => {
+          const task = taskDef.key;
+          const middagCount = (dayReqs.middag && dayReqs.middag[task]) || 0;
+          const avondCount = (dayReqs.avond && dayReqs.avond[task]) || 0;
+          const excludeAndereTaak = () =>
+            new Set(Object.keys(assignedTaskToday).filter((id) => assignedTaskToday[id] !== task));
+
+          let middagChosen = [];
+          if (middagCount > 0) {
+            middagChosen = pickCandidates(day, task, middagCount, excludeAndereTaak(), (e) =>
+              employeeTijdslotOptions(e, day.key, day.dateIso).some((o) => timeToMinutes(o.start) < cutoff)
+            );
+            middagChosen.forEach((e) => {
+              assignedTaskToday[e.id] = task;
+              shiftCount[e.id]++;
+            });
+            const ids = middagChosen.map((e) => e.id);
+            while (ids.length < middagCount) ids.push(null);
+            schedule[day.key][periodTaskKey(task, "middag")] = ids;
+            if (middagChosen.length < middagCount) {
+              warnings.push(
+                `${day.label} (middagspits) ${day.dateIso}: ${middagCount - middagChosen.length} tekort voor ${taskLabel(task)}`
+              );
+            }
           }
-        }
-        chosen.forEach((e) => {
-          assignedToday.add(e.id);
-          shiftCount[e.id]++;
+
+          if (avondCount > 0) {
+            const avondChosen = pickCandidates(day, task, avondCount, excludeAndereTaak(), (e) =>
+              employeeTijdslotOptions(e, day.key, day.dateIso).some(
+                (o) => (o.eind === "sluit" ? timeToMinutes(sluitingstijd) : timeToMinutes(o.eind)) > cutoff
+              )
+            );
+            avondChosen.forEach((e) => {
+              const dekteAlMiddag = middagChosen.some((m) => m.id === e.id);
+              assignedTaskToday[e.id] = task;
+              if (!dekteAlMiddag) shiftCount[e.id]++;
+            });
+            const ids = avondChosen.map((e) => e.id);
+            while (ids.length < avondCount) ids.push(null);
+            schedule[day.key][periodTaskKey(task, "avond")] = ids;
+            if (avondChosen.length < avondCount) {
+              warnings.push(
+                `${day.label} (avondspits) ${day.dateIso}: ${avondCount - avondChosen.length} tekort voor ${taskLabel(task)}`
+              );
+            }
+          }
         });
-        const ids = chosen.map((e) => e.id);
-        while (ids.length < count) ids.push(null);
-        schedule[day.key][task] = ids;
-        if (chosen.length < count) {
-          warnings.push(
-            `${day.label} ${day.dateIso}: ${count - chosen.length} tekort voor ${taskLabel(task)}`
-          );
-        }
-      });
+      } else {
+        const taskEntries = Object.entries(dayReqs).filter(([, count]) => count > 0);
+        const totalPool = (task) =>
+          employees.filter((e) => e.taken.includes(task) && e.dagen[day.key] && !hasFullDayVerlof(e, day.dateIso)).length;
+        // Meest schaarse taak (minste kandidaten t.o.v. behoefte) eerst toewijzen.
+        taskEntries.sort((a, b) => (totalPool(a[0]) - a[1]) - (totalPool(b[0]) - b[1]));
+
+        const assignedToday = new Set();
+        taskEntries.forEach(([task, count]) => {
+          const chosen = pickCandidates(day, task, count, assignedToday, null);
+          chosen.forEach((e) => {
+            assignedToday.add(e.id);
+            shiftCount[e.id]++;
+          });
+          const ids = chosen.map((e) => e.id);
+          while (ids.length < count) ids.push(null);
+          schedule[day.key][task] = ids;
+          if (chosen.length < count) {
+            warnings.push(`${day.label} ${day.dateIso}: ${count - chosen.length} tekort voor ${taskLabel(task)}`);
+          }
+        });
+      }
     });
 
     // Tekorten aan taken-bezetting zitten al in `warnings`; het minimum van 2 diensten en
@@ -2079,7 +2230,7 @@ th { color: var(--muted); font-weight: 600; }
 
     const { schedule, requirementsSnapshot } = currentScheduleData;
     const relevantTasks = TASKS.filter((task) =>
-      currentWeekDates.some((day) => (requirementsSnapshot[day.key] || {})[task.key] > 0)
+      currentWeekDates.some((day) => getCellGroups(requirementsSnapshot[day.key], task.key).length > 0)
     );
 
     let html = "<thead><tr><th>Taak</th>";
@@ -2091,27 +2242,31 @@ th { color: var(--muted); font-weight: 600; }
     relevantTasks.forEach((task) => {
       html += `<tr><td>${task.label}</td>`;
       currentWeekDates.forEach((day) => {
-        const required = (requirementsSnapshot[day.key] || {})[task.key] || 0;
-        if (required === 0) {
+        const groups = getCellGroups(requirementsSnapshot[day.key], task.key);
+        if (!groups.length) {
           html += "<td>—</td>";
           return;
         }
-        const ids = schedule[day.key][task.key] || [];
-        const hasEmpty = ids.some((id) => !id);
-        html += `<td data-day="${day.key}" data-task="${task.key}" class="${hasEmpty ? "understaffed" : ""}">`;
-        for (let i = 0; i < required; i++) {
-          const currentId = ids[i] || "";
-          html += `<select data-day="${day.key}" data-task="${task.key}" data-idx="${i}">`;
-          html += `<option value="" class="slot-empty-option">— leeg —</option>`;
-          employeesForTask(task.key).forEach((emp) => {
-            const selected = emp.id === currentId ? "selected" : "";
-            const dagInfo = emp.dagen[day.key];
-            const suffix = dagInfo && dagInfo.type === "beschikbaar" ? " (beschikbaar)" : "";
-            html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
-          });
-          html += `</select>`;
-          html += `<div class="tijdslot-badge" data-day="${day.key}" data-task="${task.key}" data-idx="${i}"></div>`;
-        }
+        const anyEmpty = groups.some((group) => (schedule[day.key][group.scheduleKey] || []).some((id) => !id));
+        const keysAttr = groups.map((g) => g.scheduleKey).join(",");
+        html += `<td data-day="${day.key}" data-keys="${keysAttr}" class="${anyEmpty ? "understaffed" : ""}">`;
+        groups.forEach((group) => {
+          if (group.label) html += `<div class="period-label">${group.label}</div>`;
+          const ids = schedule[day.key][group.scheduleKey] || [];
+          for (let i = 0; i < group.count; i++) {
+            const currentId = ids[i] || "";
+            html += `<select data-day="${day.key}" data-task="${group.scheduleKey}" data-idx="${i}">`;
+            html += `<option value="" class="slot-empty-option">— leeg —</option>`;
+            employeesForTask(task.key).forEach((emp) => {
+              const selected = emp.id === currentId ? "selected" : "";
+              const dagInfo = emp.dagen[day.key];
+              const suffix = dagInfo && dagInfo.type === "beschikbaar" ? " (beschikbaar)" : "";
+              html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
+            });
+            html += `</select>`;
+            html += `<div class="tijdslot-badge" data-day="${day.key}" data-task="${group.scheduleKey}" data-idx="${i}"></div>`;
+          }
+        });
         html += "</td>";
       });
       html += "</tr>";
@@ -2201,9 +2356,9 @@ th { color: var(--muted); font-weight: 600; }
   function updateUnderstaffedHighlight() {
     document.querySelectorAll("#schedule-table td[data-day]").forEach((td) => {
       const day = td.dataset.day;
-      const task = td.dataset.task;
-      const ids = currentScheduleData.schedule[day][task] || [];
-      td.classList.toggle("understaffed", ids.some((id) => !id));
+      const keys = td.dataset.keys.split(",");
+      const anyEmpty = keys.some((key) => (currentScheduleData.schedule[day][key] || []).some((id) => !id));
+      td.classList.toggle("understaffed", anyEmpty);
     });
   }
 
@@ -2211,10 +2366,16 @@ th { color: var(--muted); font-weight: 600; }
     const counts = {};
     employees.forEach((e) => (counts[e.id] = 0));
     Object.keys(scheduleData.schedule).forEach((dayKey) => {
+      // Per dag dedupliceren: iemand die zowel middag- als avondspits van dezelfde taak
+      // dekt (één lange dienst) telt voor de eerlijke verdeling als 1 dienst, niet 2.
+      const idsToday = new Set();
       Object.keys(scheduleData.schedule[dayKey]).forEach((task) => {
         (scheduleData.schedule[dayKey][task] || []).forEach((id) => {
-          if (id && counts[id] !== undefined) counts[id]++;
+          if (id) idsToday.add(id);
         });
+      });
+      idsToday.forEach((id) => {
+        if (counts[id] !== undefined) counts[id]++;
       });
     });
     return counts;
@@ -2226,13 +2387,17 @@ th { color: var(--muted); font-weight: 600; }
     const { schedule, requirementsSnapshot } = currentScheduleData;
     currentWeekDates.forEach((day) => {
       const dayReqs = requirementsSnapshot[day.key] || {};
-      Object.entries(dayReqs).forEach(([task, count]) => {
-        if (count <= 0) return;
-        const ids = schedule[day.key][task] || [];
-        const filled = ids.filter((id) => id).length;
-        if (filled < count) {
-          warnings.push(`${day.label} ${day.dateIso}: ${count - filled} tekort voor ${taskLabel(task)}`);
-        }
+      TASKS.forEach((task) => {
+        getCellGroups(dayReqs, task.key).forEach((group) => {
+          const ids = schedule[day.key][group.scheduleKey] || [];
+          const filled = ids.filter((id) => id).length;
+          if (filled < group.count) {
+            const suffix = group.label ? ` (${group.label})` : "";
+            warnings.push(
+              `${day.label}${suffix} ${day.dateIso}: ${group.count - filled} tekort voor ${taskLabel(task.key)}`
+            );
+          }
+        });
       });
     });
 
@@ -2243,7 +2408,7 @@ th { color: var(--muted); font-weight: 600; }
         (day) =>
           e.dagen[day.key] &&
           !hasFullDayVerlof(e, day.dateIso) &&
-          e.taken.some((t) => (requirementsSnapshot[day.key] || {})[t] > 0)
+          e.taken.some((t) => getCellGroups(requirementsSnapshot[day.key], t).length > 0)
       ).length;
       if (potentieleDagen >= MIN_SHIFTS_PER_WEEK) {
         warnings.push(
@@ -2263,16 +2428,21 @@ th { color: var(--muted); font-weight: 600; }
       warnings.push(...tijdslotWarnings);
     });
 
-    // Leidinggevenden (bijv. Roeland) die nooit alleen op een taak mogen staan.
+    // Leidinggevenden (bijv. Roeland) die nooit alleen op een taak mogen staan — per dagdeel
+    // gecheckt, zodat "alleen tijdens de middagspits" ook wordt opgemerkt.
     employees.forEach((e) => {
       if (!e.nooitAlleenBij) return;
       currentWeekDates.forEach((day) => {
-        const ids = (schedule[day.key][e.nooitAlleenBij] || []).filter((id) => id);
-        if (ids.includes(e.id) && ids.length === 1) {
-          warnings.push(
-            `${e.naam} staat op ${day.label} alleen bij ${taskLabel(e.nooitAlleenBij)} — moet samen met iemand anders staan.`
-          );
-        }
+        const dayReqs = requirementsSnapshot[day.key] || {};
+        getCellGroups(dayReqs, e.nooitAlleenBij).forEach((group) => {
+          const ids = (schedule[day.key][group.scheduleKey] || []).filter((id) => id);
+          if (ids.includes(e.id) && ids.length === 1) {
+            const suffix = group.label ? ` (${group.label})` : "";
+            warnings.push(
+              `${e.naam} staat op ${day.label}${suffix} alleen bij ${taskLabel(e.nooitAlleenBij)} — moet samen met iemand anders staan.`
+            );
+          }
+        });
       });
     });
 
