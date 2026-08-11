@@ -582,6 +582,11 @@ th { color: var(--muted); font-weight: 600; }
             <input type="checkbox" id="employee-mag-open-tot-sluit">
             Mag van openen tot sluiten werken (uitzondering — bepaalt of de "openen tot sluit"-tijdopties hieronder aanvinkbaar zijn)
           </label>
+          <label class="contract-checkbox-label">
+            <input type="checkbox" id="employee-heeft-sleutel">
+            Heeft een sleutel (leidinggevende die de zaak kan afsluiten)
+          </label>
+          <p class="fieldset-hint">Bij het sluiten zorgt de generator dat er minstens 1 sleutelhouder in de sluitploeg staat, en waarschuwt als dat niet lukt.</p>
         </fieldset>
 
         <fieldset>
@@ -844,7 +849,8 @@ th { color: var(--muted); font-weight: 600; }
     { key: "kassa", label: "Kassa" },
     { key: "friet", label: "Friet" },
     { key: "snack", label: "Snack" },
-    { key: "bakplaat", label: "Bakplaat" },
+    { key: "hoofdplaat", label: "Hoofd plaat" },
+    { key: "assistentplaat", label: "Assistent plaat" },
     { key: "fietsbezorgen", label: "Fietsbezorgen" },
     { key: "autobezorgen", label: "Autobezorgen" },
     { key: "vliegende_keep", label: "Vliegende keep" },
@@ -863,16 +869,16 @@ th { color: var(--muted); font-weight: 600; }
   // Vrijdag is opgesplitst in middagspits/avondspits met een eigen bezetting per periode
   // (in plaats van één aantal per taak voor de hele dag). Zie isPeriodDag()/getCellGroups().
   const DEFAULT_REQUIREMENTS = {
-    dinsdag: { kassa: 1, snack: 1, friet: 1, bakplaat: 1, vliegende_keep: 1, fietsbezorgen: 2 },
-    woensdag: { kassa: 1, snack: 1, friet: 1, bakplaat: 1, vliegende_keep: 1, fietsbezorgen: 2 },
-    donderdag: { kassa: 2, bakplaat: 2, friet: 1, snack: 1, fietsbezorgen: 2 },
+    dinsdag: { kassa: 1, snack: 1, friet: 1, hoofdplaat: 1, vliegende_keep: 1, fietsbezorgen: 2 },
+    woensdag: { kassa: 1, snack: 1, friet: 1, hoofdplaat: 1, vliegende_keep: 1, fietsbezorgen: 2 },
+    donderdag: { kassa: 2, hoofdplaat: 1, assistentplaat: 1, friet: 1, snack: 1, fietsbezorgen: 2 },
     vrijdag: {
       omslag: "16:30",
-      middag: { kassa: 1, friet: 1, snack: 1, bakplaat: 1, vliegende_keep: 1 },
-      avond: { kassa: 2, friet: 1, snack: 1, bakplaat: 2, fietsbezorgen: 3, autobezorgen: 1 },
+      middag: { kassa: 1, friet: 1, snack: 1, hoofdplaat: 1, vliegende_keep: 1 },
+      avond: { kassa: 2, friet: 1, snack: 1, hoofdplaat: 1, assistentplaat: 1, fietsbezorgen: 3, autobezorgen: 1 },
     },
-    zaterdag: { kassa: 2, bakplaat: 2, snack: 1, friet: 1, fietsbezorgen: 3 },
-    zondag: { kassa: 2, bakplaat: 2, friet: 1, snack: 1, fietsbezorgen: 3, autobezorgen: 1 },
+    zaterdag: { kassa: 2, hoofdplaat: 1, assistentplaat: 1, snack: 1, friet: 1, fietsbezorgen: 3 },
+    zondag: { kassa: 2, hoofdplaat: 1, assistentplaat: 1, friet: 1, snack: 1, fietsbezorgen: 3, autobezorgen: 1 },
   };
 
   // Tijdopties, openers en aantal sluiters per dag. "Sluit" is een letterlijke waarde
@@ -943,6 +949,11 @@ th { color: var(--muted); font-weight: 600; }
     const t = TASKS.find((t) => t.key === key);
     return t ? t.label : key;
   }
+  // Migratie: "bakplaat" is opgesplitst in "hoofdplaat" + "assistentplaat"; oude
+  // verwijzingen naar de taak worden bij het laden omgezet naar "hoofdplaat".
+  function migrateTaskKey(key) {
+    return key === "bakplaat" ? "hoofdplaat" : key;
+  }
   function dayLabel(key) {
     const d = DAYS.find((d) => d.key === key);
     return d ? d.label : key;
@@ -1006,11 +1017,17 @@ th { color: var(--muted); font-weight: 600; }
     delete clean.dienstType;
     clean.dagen = dagen;
     clean.verlof = verlof;
+    clean.taken = Array.isArray(emp.taken)
+      ? Array.from(new Set(emp.taken.map(migrateTaskKey).filter((t) => TASKS.some((task) => task.key === t))))
+      : [];
     clean.magOpenTotSluit = !!emp.magOpenTotSluit;
-    clean.nooitAlleenBij = TASKS.some((t) => t.key === emp.nooitAlleenBij) ? emp.nooitAlleenBij : null;
+    clean.heeftSleutel = !!emp.heeftSleutel;
+    const migratedNooitAlleenBij = emp.nooitAlleenBij ? migrateTaskKey(emp.nooitAlleenBij) : null;
+    clean.nooitAlleenBij = TASKS.some((t) => t.key === migratedNooitAlleenBij) ? migratedNooitAlleenBij : null;
     const takenUitzonderingen = {};
     if (emp.takenUitzonderingen && typeof emp.takenUitzonderingen === "object") {
-      Object.entries(emp.takenUitzonderingen).forEach(([taskKey, dagenLijst]) => {
+      Object.entries(emp.takenUitzonderingen).forEach(([taskKeyRaw, dagenLijst]) => {
+        const taskKey = migrateTaskKey(taskKeyRaw);
         if (!TASKS.some((t) => t.key === taskKey) || !Array.isArray(dagenLijst)) return;
         const geldigeDagen = dagenLijst.filter((d) => DAYS.some((day) => day.key === d));
         if (geldigeDagen.length) takenUitzonderingen[taskKey] = geldigeDagen;
@@ -1057,10 +1074,40 @@ th { color: var(--muted); font-weight: 600; }
   function saveEmployees(list) {
     localStorage.setItem(STORAGE_KEYS.employees, JSON.stringify(list));
   }
+  // Migratie: eerder opgeslagen bezetting kan nog een "bakplaat"-aantal bevatten van vóór de
+  // opsplitsing in hoofdplaat/assistentplaat. 1 persoon wordt hoofdplaat; elke extra wordt assistent.
+  function splitBakplaatCount(count) {
+    const c = count || 0;
+    return { hoofdplaat: c > 0 ? 1 : 0, assistentplaat: c > 1 ? c - 1 : 0 };
+  }
+  function migrateBakplaatInFlatReqs(flatReqs) {
+    if (!flatReqs || flatReqs.bakplaat === undefined) return flatReqs;
+    const { hoofdplaat, assistentplaat } = splitBakplaatCount(flatReqs.bakplaat);
+    const next = Object.assign({}, flatReqs);
+    delete next.bakplaat;
+    if (hoofdplaat) next.hoofdplaat = (next.hoofdplaat || 0) + hoofdplaat;
+    if (assistentplaat) next.assistentplaat = (next.assistentplaat || 0) + assistentplaat;
+    return next;
+  }
+  function migrateBakplaatInRequirements(reqs) {
+    const next = {};
+    Object.keys(reqs).forEach((dayKey) => {
+      const dayReqs = reqs[dayKey];
+      if (isPeriodDag(dayReqs)) {
+        next[dayKey] = Object.assign({}, dayReqs);
+        if (dayReqs.middag) next[dayKey].middag = migrateBakplaatInFlatReqs(dayReqs.middag);
+        if (dayReqs.avond) next[dayKey].avond = migrateBakplaatInFlatReqs(dayReqs.avond);
+      } else {
+        next[dayKey] = migrateBakplaatInFlatReqs(dayReqs);
+      }
+    });
+    return next;
+  }
   function loadRequirements() {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.requirements);
-      return raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
+      const parsed = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
+      return migrateBakplaatInRequirements(parsed);
     } catch (e) {
       return JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
     }
@@ -1110,7 +1157,13 @@ th { color: var(--muted); font-weight: 600; }
   function loadForbiddenPairs() {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.forbiddenPairs);
-      return raw ? JSON.parse(raw) : {};
+      const parsed = raw ? JSON.parse(raw) : {};
+      const migrated = {};
+      Object.entries(parsed).forEach(([taskKeyRaw, pairs]) => {
+        const taskKey = migrateTaskKey(taskKeyRaw);
+        migrated[taskKey] = (migrated[taskKey] || []).concat(pairs);
+      });
+      return migrated;
     } catch (e) {
       return {};
     }
@@ -1235,10 +1288,12 @@ th { color: var(--muted); font-weight: 600; }
     const sluitCountAlready = Object.values(assignments).filter((a) => a.eind === "sluit").length;
     const sluitersNodig = (daySettings.sluiters || 0) - sluitCountAlready;
     if (sluitersNodig > 0) {
+      // Sleutelhouders krijgen voorrang in de sluitploeg, zodat er zoveel mogelijk automatisch
+      // minstens 1 sleutelhouder aanwezig is bij het afsluiten.
       const candidates = Array.from(remaining)
         .map(empById)
         .filter((e) => e && employeeTijdslotOptions(e, dayKey, dateIso).some((o) => o.eind === "sluit"))
-        .sort((a, b) => a.naam.localeCompare(b.naam));
+        .sort((a, b) => (b.heeftSleutel ? 1 : 0) - (a.heeftSleutel ? 1 : 0) || a.naam.localeCompare(b.naam));
       const gekozen = candidates.slice(0, sluitersNodig);
       gekozen.forEach((e) => {
         assignments[e.id] = employeeTijdslotOptions(e, dayKey, dateIso).find((o) => o.eind === "sluit");
@@ -1261,6 +1316,18 @@ th { color: var(--muted); font-weight: 600; }
       if (chosen) assignments[id] = chosen;
       else warnings.push(`${e.naam} heeft geen passende tijdoptie ingesteld voor ${dayLabel(dayKey)}.`);
     });
+
+    // Er moet minstens 1 sleutelhouder in de sluitploeg staan om daadwerkelijk af te kunnen sluiten.
+    if ((daySettings.sluiters || 0) > 0) {
+      const sluiters = Object.keys(assignments).filter((id) => assignments[id].eind === "sluit");
+      const heeftSleutelhouder = sluiters.some((id) => {
+        const e = empById(id);
+        return e && e.heeftSleutel;
+      });
+      if (sluiters.length > 0 && !heeftSleutelhouder) {
+        warnings.push(`${dayLabel(dayKey)}: niemand met een sleutel staat ingepland om te sluiten.`);
+      }
+    }
 
     return { assignments, warnings };
   }
@@ -1481,6 +1548,14 @@ th { color: var(--muted); font-weight: 600; }
     magOpenTotSluitCheckbox.checked = !!val;
   }
 
+  const heeftSleutelCheckbox = document.getElementById("employee-heeft-sleutel");
+  function getHeeftSleutel() {
+    return heeftSleutelCheckbox.checked;
+  }
+  function setHeeftSleutel(val) {
+    heeftSleutelCheckbox.checked = !!val;
+  }
+
   function getDagenData() {
     const dagen = {};
     [
@@ -1634,6 +1709,7 @@ th { color: var(--muted); font-weight: 600; }
     document.getElementById("employee-form").reset();
     setTakenData([], {});
     setMagOpenTotSluit(false);
+    setHeeftSleutel(false);
     setNooitAlleenBij(null);
     setDagenData({});
     setContractData(null);
@@ -1648,6 +1724,7 @@ th { color: var(--muted); font-weight: 600; }
     if (!naam) return;
     const { taken, takenUitzonderingen } = getTakenData();
     const magOpenTotSluit = getMagOpenTotSluit();
+    const heeftSleutel = getHeeftSleutel();
     const nooitAlleenBij = getNooitAlleenBij();
     const dagen = getDagenData();
     const contract = getContractData();
@@ -1658,6 +1735,7 @@ th { color: var(--muted); font-weight: 600; }
       emp.taken = taken;
       emp.takenUitzonderingen = takenUitzonderingen;
       emp.magOpenTotSluit = magOpenTotSluit;
+      emp.heeftSleutel = heeftSleutel;
       emp.nooitAlleenBij = nooitAlleenBij;
       emp.dagen = dagen;
       emp.contract = contract;
@@ -1669,6 +1747,7 @@ th { color: var(--muted); font-weight: 600; }
         taken,
         takenUitzonderingen,
         magOpenTotSluit,
+        heeftSleutel,
         nooitAlleenBij,
         dagen,
         contract,
@@ -1690,6 +1769,7 @@ th { color: var(--muted); font-weight: 600; }
     document.getElementById("employee-naam").value = emp.naam;
     setTakenData(emp.taken, emp.takenUitzonderingen);
     setMagOpenTotSluit(emp.magOpenTotSluit);
+    setHeeftSleutel(emp.heeftSleutel);
     setNooitAlleenBij(emp.nooitAlleenBij);
     setDagenData(emp.dagen);
     setContractData(emp.contract);
@@ -1723,8 +1803,11 @@ th { color: var(--muted); font-weight: 600; }
         const tr = document.createElement("tr");
 
         const tdNaam = document.createElement("td");
-        tdNaam.textContent = emp.naam + (emp.magOpenTotSluit ? " 🔓" : "");
-        if (emp.magOpenTotSluit) tdNaam.title = "Mag van openen tot sluiten werken";
+        tdNaam.textContent = emp.naam + (emp.magOpenTotSluit ? " 🔓" : "") + (emp.heeftSleutel ? " 🔑" : "");
+        const naamTitels = [];
+        if (emp.magOpenTotSluit) naamTitels.push("Mag van openen tot sluiten werken");
+        if (emp.heeftSleutel) naamTitels.push("Heeft een sleutel");
+        if (naamTitels.length) tdNaam.title = naamTitels.join(" · ");
         tr.appendChild(tdNaam);
 
         const tdTaken = document.createElement("td");
