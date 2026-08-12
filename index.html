@@ -519,10 +519,34 @@ th { color: var(--muted); font-weight: 600; }
   font-size: 0.78rem;
   color: var(--muted);
   margin: -0.15rem 0 0.4rem;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  padding: 0.1rem 0.25rem;
+  font-family: inherit;
+}
+
+.tijdslot-badge:hover:not(:disabled),
+.tijdslot-badge:focus {
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.tijdslot-badge:disabled {
+  opacity: 0.5;
 }
 
 .tijdslot-badge.tijdslot-missing {
   color: var(--danger);
+}
+
+.tijdslot-badge.tijdslot-overridden {
+  color: var(--secondary-dark);
+  font-weight: 600;
+  border-color: var(--border);
+  background: var(--bg);
 }
 
 #open-sluit-table textarea {
@@ -1237,6 +1261,43 @@ th { color: var(--muted); font-weight: 600; }
   function parseTijdslot(label) {
     const parts = label.split(" - ").map((s) => s.trim());
     return { label, start: parts[0], eind: parts[1] };
+  }
+  // Parseert een vrij getypte tijd zoals "16:30 - 20:00", "16:30 tot sluit" of "1630-2000"
+  // die de gebruiker zelf intikt in het rooster, in plaats van te kiezen uit de vaste tijdsloten.
+  function parseFreeTijdslot(text) {
+    if (!text) return null;
+    const parts = text.trim().split(/\s*(?:-|tot)\s*/i);
+    if (parts.length !== 2) return null;
+    const normalizeTime = (s) => {
+      const t = s.trim().toLowerCase();
+      if (t === "sluit") return "sluit";
+      const m = t.replace(".", ":").match(/^(\d{1,2}):?(\d{2})$/);
+      if (!m) return null;
+      return `${m[1].padStart(2, "0")}:${m[2]}`;
+    };
+    const start = normalizeTime(parts[0]);
+    const eind = normalizeTime(parts[1]);
+    if (!start || !eind || start === "sluit") return null;
+    return { label: `${start} - ${eind === "sluit" ? "sluit" : eind}`, start, eind };
+  }
+  // Vult automatisch berekende tijdslot-toewijzingen aan/overschrijft ze met handmatig
+  // getypte tijden per medewerker per dag, en filtert de bijbehorende "geen tijdoptie"
+  // waarschuwing weg zodra iemand handmatig een geldige tijd heeft ingevuld.
+  function mergeTijdslotOverrides(dayKey, assignments, warnings, scheduleData) {
+    const dayOverrides = (scheduleData && scheduleData.tijdslotOverrides && scheduleData.tijdslotOverrides[dayKey]) || {};
+    const merged = { ...assignments };
+    let filteredWarnings = warnings;
+    Object.keys(dayOverrides).forEach((empId) => {
+      const parsed = parseFreeTijdslot(dayOverrides[empId]);
+      if (!parsed) return;
+      merged[empId] = parsed;
+      const emp = employees.find((e) => e.id === empId);
+      if (emp) {
+        const missingWarning = `${emp.naam} heeft geen passende tijdoptie ingesteld voor ${dayLabel(dayKey)}.`;
+        filteredWarnings = filteredWarnings.filter((w) => w !== missingWarning);
+      }
+    });
+    return { assignments: merged, warnings: filteredWarnings };
   }
   function tijdslotenForDay(dayKey) {
     return ((openSluit[dayKey] && openSluit[dayKey].tijdsloten) || []).map(parseTijdslot);
@@ -2312,7 +2373,8 @@ th { color: var(--muted); font-weight: 600; }
         });
       });
       if (!idsToday.has(emp.id)) return;
-      const { assignments } = assignTijdslotenForDay(dayKey, dateIsoByDay[dayKey], Array.from(idsToday));
+      const auto = assignTijdslotenForDay(dayKey, dateIsoByDay[dayKey], Array.from(idsToday));
+      const { assignments } = mergeTijdslotOverrides(dayKey, auto.assignments, auto.warnings, scheduleData);
       const opt = assignments[emp.id];
       if (opt) hours += durationHours(opt.start, opt.eind);
     });
@@ -2570,7 +2632,7 @@ th { color: var(--muted); font-weight: 600; }
               html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
             });
             html += `</select>`;
-            html += `<div class="tijdslot-badge" data-day="${day.key}" data-task="${group.scheduleKey}" data-idx="${i}"></div>`;
+            html += `<input type="text" class="tijdslot-badge" data-day="${day.key}" data-task="${group.scheduleKey}" data-idx="${i}" placeholder="tijd typen, bv. 16:00 - sluit">`;
           }
         });
         html += "</td>";
@@ -2583,6 +2645,9 @@ th { color: var(--muted); font-weight: 600; }
     table.querySelectorAll("select").forEach((select) => {
       applySelectWarningClass(select);
       select.addEventListener("change", onScheduleSelectChange);
+    });
+    table.querySelectorAll("input.tijdslot-badge").forEach((input) => {
+      input.addEventListener("change", onTijdslotBadgeChange);
     });
     refreshTijdslotBadges();
   }
@@ -2627,22 +2692,32 @@ th { color: var(--muted); font-weight: 600; }
           if (id) idsToday.add(id);
         });
       });
-      const { assignments } = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
+      const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
+      const { assignments } = mergeTijdslotOverrides(day.key, auto.assignments, auto.warnings, currentScheduleData);
+      const dayOverrides = (currentScheduleData.tijdslotOverrides && currentScheduleData.tijdslotOverrides[day.key]) || {};
       document.querySelectorAll(`.tijdslot-badge[data-day="${day.key}"]`).forEach((badge) => {
         const task = badge.dataset.task;
         const idx = Number(badge.dataset.idx);
         const id = (schedule[day.key][task] || [])[idx];
+        badge.classList.remove("tijdslot-missing", "tijdslot-overridden");
         if (!id) {
-          badge.textContent = "";
-          badge.classList.remove("tijdslot-missing");
+          badge.value = "";
+          badge.disabled = true;
+          badge.placeholder = "";
+          return;
+        }
+        badge.disabled = false;
+        if (dayOverrides[id]) {
+          badge.value = dayOverrides[id];
+          badge.classList.add("tijdslot-overridden");
           return;
         }
         const opt = assignments[id];
         if (opt) {
-          badge.textContent = `${opt.start} – ${opt.eind === "sluit" ? "sluit" : opt.eind}`;
-          badge.classList.remove("tijdslot-missing");
+          badge.value = `${opt.start} - ${opt.eind === "sluit" ? "sluit" : opt.eind}`;
         } else {
-          badge.textContent = "geen tijdoptie";
+          badge.value = "";
+          badge.placeholder = "geen tijdoptie — typ zelf een tijd";
           badge.classList.add("tijdslot-missing");
         }
       });
@@ -2657,6 +2732,27 @@ th { color: var(--muted); font-weight: 600; }
     saveSchedule(currentWeekValue, currentScheduleData);
     applySelectWarningClass(select);
     updateUnderstaffedHighlight();
+    refreshTijdslotBadges();
+    renderWarnings(computeWarningsFromCurrent());
+    renderContractProgress();
+  }
+
+  // Slaat een handmatig getypte tijd op als overschrijving van de automatisch berekende
+  // tijdslot-toewijzing voor deze medewerker op deze dag (leeg maken herstelt de automatische tijd).
+  function onTijdslotBadgeChange(e) {
+    const input = e.target;
+    const { day, task, idx } = input.dataset;
+    const id = (currentScheduleData.schedule[day][task] || [])[Number(idx)];
+    if (!id) return;
+    if (!currentScheduleData.tijdslotOverrides) currentScheduleData.tijdslotOverrides = {};
+    if (!currentScheduleData.tijdslotOverrides[day]) currentScheduleData.tijdslotOverrides[day] = {};
+    const value = input.value.trim();
+    if (value) {
+      currentScheduleData.tijdslotOverrides[day][id] = value;
+    } else {
+      delete currentScheduleData.tijdslotOverrides[day][id];
+    }
+    saveSchedule(currentWeekValue, currentScheduleData);
     refreshTijdslotBadges();
     renderWarnings(computeWarningsFromCurrent());
     renderContractProgress();
@@ -2733,7 +2829,8 @@ th { color: var(--muted); font-weight: 600; }
           if (id) idsToday.add(id);
         });
       });
-      const { warnings: tijdslotWarnings } = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
+      const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
+      const { warnings: tijdslotWarnings } = mergeTijdslotOverrides(day.key, auto.assignments, auto.warnings, currentScheduleData);
       warnings.push(...tijdslotWarnings);
     });
 
@@ -2833,7 +2930,7 @@ th { color: var(--muted); font-weight: 600; }
     currentWeekDates = computeWeekDates(weekValue);
     const requirementsSnapshot = JSON.parse(JSON.stringify(requirements));
     const { schedule } = generateSchedule(currentWeekDates, requirementsSnapshot, weekValue);
-    currentScheduleData = { schedule, requirementsSnapshot };
+    currentScheduleData = { schedule, requirementsSnapshot, tijdslotOverrides: {} };
     saveSchedule(currentWeekValue, currentScheduleData);
     renderScheduleTable();
     renderWarnings(computeWarningsFromCurrent());
@@ -2847,6 +2944,7 @@ th { color: var(--muted); font-weight: 600; }
     if (saved) {
       currentWeekValue = weekValue;
       currentWeekDates = computeWeekDates(weekValue);
+      if (!saved.tijdslotOverrides) saved.tijdslotOverrides = {};
       currentScheduleData = saved;
       renderScheduleTable();
       renderWarnings(computeWarningsFromCurrent());
