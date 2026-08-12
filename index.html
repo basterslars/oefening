@@ -665,6 +665,23 @@ th { color: var(--muted); font-weight: 600; }
           <ul id="employee-verlof-list" class="verlof-list"></ul>
         </fieldset>
 
+        <fieldset>
+          <legend>Dienst aanvragen</legend>
+          <p class="fieldset-hint">Wil iemand juist graag een specifieke dienst werken (bijv. kassa op een bepaalde datum)? Zet dat hier neer — de generator geeft zo'n aanvraag voorrang boven de gewone eerlijke verdeling.</p>
+          <div class="verlof-input-row">
+            <label class="verlof-inline-label">
+              Datum
+              <input type="date" id="employee-aanvraag-datum">
+            </label>
+            <label class="verlof-inline-label">
+              Taak
+              <select id="employee-aanvraag-taak"></select>
+            </label>
+            <button type="button" id="add-aanvraag-btn" class="btn-secondary">+ Toevoegen</button>
+          </div>
+          <ul id="employee-aanvraag-list" class="verlof-list"></ul>
+        </fieldset>
+
         <div class="form-actions">
           <button type="submit" class="btn-primary">Opslaan</button>
           <button type="button" id="employee-cancel-btn" class="btn-secondary" hidden>Annuleren</button>
@@ -692,6 +709,7 @@ th { color: var(--muted); font-weight: 600; }
             <th>Beschikbaar</th>
             <th>Contract</th>
             <th>Verlof</th>
+            <th>Dienstaanvragen</th>
             <th></th>
           </tr>
         </thead>
@@ -835,6 +853,15 @@ th { color: var(--muted); font-weight: 600; }
         <table id="verlof-overview-table"></table>
       </div>
       <p id="verlof-overview-empty" class="empty-msg" hidden>Niemand heeft vrij gevraagd deze week.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Dienstaanvragen deze week</h2>
+      <p class="fieldset-hint">Wie een specifieke dienst heeft aangevraagd, en of die aanvraag in het (laatst gegenereerde) rooster is gehonoreerd.</p>
+      <div class="table-scroll">
+        <table id="aanvraag-overview-table"></table>
+      </div>
+      <p id="aanvraag-overview-empty" class="empty-msg" hidden>Niemand heeft deze week een dienst aangevraagd.</p>
     </div>
   </section>
 </main>
@@ -1034,6 +1061,11 @@ th { color: var(--muted); font-weight: 600; }
       });
     }
     clean.takenUitzonderingen = takenUitzonderingen;
+    clean.dienstAanvragen = Array.isArray(emp.dienstAanvragen)
+      ? emp.dienstAanvragen
+          .map((a) => (a && a.datum ? { datum: a.datum, taak: migrateTaskKey(a.taak) } : null))
+          .filter((a) => a && TASKS.some((t) => t.key === a.taak))
+      : [];
     clean.contract = {
       vast: !!contract.vast,
       uren: typeof contract.uren === "number" && contract.uren > 0 ? contract.uren : 0,
@@ -1340,6 +1372,10 @@ th { color: var(--muted); font-weight: 600; }
       document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
       btn.classList.add("active");
       document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+      if (btn.dataset.tab === "vrijvraging") {
+        renderVerlofOverview();
+        renderAanvraagOverview();
+      }
     });
   });
 
@@ -1701,11 +1737,51 @@ th { color: var(--muted); font-weight: 600; }
     verlofTijdInput.hidden = true;
   });
 
+  // ---------- Dienst aanvragen in het formulier ----------
+
+  let employeeFormAanvragen = [];
+  const aanvraagTaakSelect = document.getElementById("employee-aanvraag-taak");
+  aanvraagTaakSelect.innerHTML = TASKS.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+
+  function renderAanvraagList() {
+    const ul = document.getElementById("employee-aanvraag-list");
+    ul.innerHTML = "";
+    employeeFormAanvragen
+      .slice()
+      .sort((a, b) => a.datum.localeCompare(b.datum))
+      .forEach((aanvraag) => {
+        const li = document.createElement("li");
+        li.textContent = `${aanvraag.datum} — ${taskLabel(aanvraag.taak)} `;
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.textContent = "✕";
+        removeBtn.addEventListener("click", () => {
+          employeeFormAanvragen = employeeFormAanvragen.filter(
+            (a) => !(a.datum === aanvraag.datum && a.taak === aanvraag.taak)
+          );
+          renderAanvraagList();
+        });
+        li.appendChild(removeBtn);
+        ul.appendChild(li);
+      });
+  }
+
+  document.getElementById("add-aanvraag-btn").addEventListener("click", () => {
+    const datumInput = document.getElementById("employee-aanvraag-datum");
+    if (!datumInput.value) return;
+    const taak = aanvraagTaakSelect.value;
+    const bestaatAl = employeeFormAanvragen.some((a) => a.datum === datumInput.value && a.taak === taak);
+    if (!bestaatAl) employeeFormAanvragen.push({ datum: datumInput.value, taak });
+    renderAanvraagList();
+    datumInput.value = "";
+  });
+
   // ---------- Employee form submit / reset ----------
 
   function resetEmployeeForm() {
     editingEmployeeId = null;
     employeeFormVerlof = [];
+    employeeFormAanvragen = [];
     document.getElementById("employee-form").reset();
     setTakenData([], {});
     setMagOpenTotSluit(false);
@@ -1714,6 +1790,7 @@ th { color: var(--muted); font-weight: 600; }
     setDagenData({});
     setContractData(null);
     renderVerlofList();
+    renderAanvraagList();
     document.getElementById("employee-form-title").textContent = "Nieuwe medewerker";
     document.getElementById("employee-cancel-btn").hidden = true;
   }
@@ -1740,6 +1817,7 @@ th { color: var(--muted); font-weight: 600; }
       emp.dagen = dagen;
       emp.contract = contract;
       emp.verlof = employeeFormVerlof.slice();
+      emp.dienstAanvragen = employeeFormAanvragen.slice();
     } else {
       employees.push({
         id: uid(),
@@ -1752,6 +1830,7 @@ th { color: var(--muted); font-weight: 600; }
         dagen,
         contract,
         verlof: employeeFormVerlof.slice(),
+        dienstAanvragen: employeeFormAanvragen.slice(),
       });
     }
     saveEmployees(employees);
@@ -1766,6 +1845,7 @@ th { color: var(--muted); font-weight: 600; }
     if (!emp) return;
     editingEmployeeId = id;
     employeeFormVerlof = emp.verlof.slice();
+    employeeFormAanvragen = emp.dienstAanvragen.slice();
     document.getElementById("employee-naam").value = emp.naam;
     setTakenData(emp.taken, emp.takenUitzonderingen);
     setMagOpenTotSluit(emp.magOpenTotSluit);
@@ -1774,6 +1854,7 @@ th { color: var(--muted); font-weight: 600; }
     setDagenData(emp.dagen);
     setContractData(emp.contract);
     renderVerlofList();
+    renderAanvraagList();
     document.getElementById("employee-form-title").textContent = "Medewerker bewerken: " + emp.naam;
     document.getElementById("employee-cancel-btn").hidden = false;
     document.getElementById("employee-form").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1860,6 +1941,15 @@ th { color: var(--muted); font-weight: 600; }
             .join("") || "—";
         tr.appendChild(tdVerlof);
 
+        const tdAanvragen = document.createElement("td");
+        tdAanvragen.innerHTML =
+          emp.dienstAanvragen
+            .slice()
+            .sort((a, b) => a.datum.localeCompare(b.datum))
+            .map((a) => `<span class="tag tag-beschikbaar">${a.datum} — ${taskLabel(a.taak)}</span>`)
+            .join("") || "—";
+        tr.appendChild(tdAanvragen);
+
         const tdActions = document.createElement("td");
         tdActions.className = "row-actions";
         const editBtn = document.createElement("button");
@@ -1878,6 +1968,7 @@ th { color: var(--muted); font-weight: 600; }
 
     renderForbiddenEmployeeSelects();
     renderVerlofOverview();
+    renderAanvraagOverview();
   }
 
   // ---------- Export / import ----------
@@ -2280,6 +2371,10 @@ th { color: var(--muted); font-weight: 600; }
       return shiftCount[a.id] - shiftCount[b.id] || a.naam.localeCompare(b.naam);
     };
 
+    function heeftDienstaanvraag(e, day, task) {
+      return (e.dienstAanvragen || []).some((a) => a.datum === day.dateIso && a.taak === task);
+    }
+
     // Kiest kandidaten voor een taak/dag, met voorrang zoals hierboven, verboden koppels
     // vermeden, en optioneel een extra geschiktheidscheck (bijv. "kan die dag voor 16:30
     // beginnen") voor het dagdeel-scenario hieronder. Gedeeltelijk verlof (vanaf/tot
@@ -2295,11 +2390,21 @@ th { color: var(--muted); font-weight: 600; }
         !hasFullDayVerlof(e, day.dateIso) &&
         !excludeIds.has(e.id) &&
         (!extraEligibleFn || extraEligibleFn(e));
+      // Een openstaande dienstaanvraag voor precies deze taak/datum gaat vóór de gewone
+      // eerlijke-verdeling-voorrang.
+      const byPriorityMetAanvraag = (a, b) => {
+        const reqA = heeftDienstaanvraag(a, day, task) ? 0 : 1;
+        const reqB = heeftDienstaanvraag(b, day, task) ? 0 : 1;
+        if (reqA !== reqB) return reqA - reqB;
+        return byPriority(a, b);
+      };
 
-      const vasteCandidates = employees.filter((e) => eligible(e) && e.dagen[day.key].type === "vast").sort(byPriority);
+      const vasteCandidates = employees
+        .filter((e) => eligible(e) && e.dagen[day.key].type === "vast")
+        .sort(byPriorityMetAanvraag);
       const beschikbaarCandidates = employees
         .filter((e) => eligible(e) && e.dagen[day.key].type === "beschikbaar")
-        .sort(byPriority);
+        .sort(byPriorityMetAanvraag);
 
       const chosen = [];
       for (const cand of vasteCandidates) {
@@ -2789,7 +2894,51 @@ th { color: var(--muted); font-weight: 600; }
     table.innerHTML = html;
   }
 
-  verlofWeekPicker.addEventListener("change", renderVerlofOverview);
+  verlofWeekPicker.addEventListener("change", () => {
+    renderVerlofOverview();
+    renderAanvraagOverview();
+  });
+
+  function renderAanvraagOverview() {
+    const weekValue = verlofWeekPicker.value || isoWeekStringFor(new Date());
+    const weekDates = computeWeekDates(weekValue);
+    const table = document.getElementById("aanvraag-overview-table");
+    const emptyMsg = document.getElementById("aanvraag-overview-empty");
+    const scheduleData = loadSchedule(weekValue);
+
+    const rows = [];
+    weekDates.forEach((day) => {
+      employees.forEach((e) => {
+        (e.dienstAanvragen || []).forEach((a) => {
+          if (a.datum !== day.dateIso) return;
+          let status = "Nog geen rooster gegenereerd voor deze week";
+          let statusClass = "";
+          if (scheduleData) {
+            const daySchedule = scheduleData.schedule[day.key] || {};
+            const toegewezen = Object.keys(daySchedule).some(
+              (key) => baseTaskKey(key) === a.taak && (daySchedule[key] || []).includes(e.id)
+            );
+            status = toegewezen ? "✅ toegewezen" : "❌ niet toegewezen";
+            statusClass = toegewezen ? "saldo-overschot" : "saldo-tekort";
+          }
+          rows.push({ day, naam: e.naam, taak: a.taak, status, statusClass });
+        });
+      });
+    });
+
+    emptyMsg.hidden = rows.length > 0;
+
+    let html = "<thead><tr><th>Dag</th><th>Naam</th><th>Taak</th><th>Status</th></tr></thead><tbody>";
+    rows
+      .sort((a, b) => a.day.dateIso.localeCompare(b.day.dateIso) || a.naam.localeCompare(b.naam))
+      .forEach((r) => {
+        html += `<tr><td>${r.day.label}<br><small>${r.day.dateIso}</small></td><td>${r.naam}</td><td>${taskLabel(
+          r.taak
+        )}</td><td class="${r.statusClass}">${r.status}</td></tr>`;
+      });
+    html += "</tbody>";
+    table.innerHTML = html;
+  }
 
   // ---------- Init ----------
 
@@ -2799,7 +2948,9 @@ th { color: var(--muted); font-weight: 600; }
   renderForbiddenTaskSelect();
   renderForbiddenPairsList();
   renderVerlofList();
+  renderAanvraagList();
   renderVerlofOverview();
+  renderAanvraagOverview();
   tryLoadExistingSchedule();
 })();
 </script>
