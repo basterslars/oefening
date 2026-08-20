@@ -197,6 +197,21 @@ legend {
   color: var(--muted);
 }
 
+.taak-secundair-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border);
+}
+
+.tag.tag-secundair {
+  border-style: dashed;
+  color: var(--muted);
+}
+
 .fieldset-hint {
   margin: 0 0 0.7rem;
   font-size: 0.82rem;
@@ -1108,6 +1123,11 @@ th { color: var(--muted); font-weight: 600; }
     clean.taken = Array.isArray(emp.taken)
       ? Array.from(new Set(emp.taken.map(migrateTaskKey).filter((t) => TASKS.some((task) => task.key === t))))
       : [];
+    // Secundaire taken: kan de medewerker wel, maar doet die niet vaak/niet het liefst —
+    // moet altijd een subset van "taken" blijven.
+    clean.secundaireTaken = Array.isArray(emp.secundaireTaken)
+      ? Array.from(new Set(emp.secundaireTaken.map(migrateTaskKey).filter((t) => clean.taken.includes(t))))
+      : [];
     clean.magOpenTotSluit = !!emp.magOpenTotSluit;
     clean.heeftSleutel = !!emp.heeftSleutel;
     const migratedNooitAlleenBij = emp.nooitAlleenBij ? migrateTaskKey(emp.nooitAlleenBij) : null;
@@ -1515,15 +1535,29 @@ th { color: var(--muted); font-weight: 600; }
         uitzonderingenBox.appendChild(dagLabel);
       });
 
+      const secundairLabel = document.createElement("label");
+      secundairLabel.className = "taak-secundair-label";
+      const secundairCheckbox = document.createElement("input");
+      secundairCheckbox.type = "checkbox";
+      secundairCheckbox.className = "taak-secundair-checkbox";
+      secundairCheckbox.disabled = true;
+      secundairLabel.appendChild(secundairCheckbox);
+      secundairLabel.appendChild(
+        document.createTextNode(" Secundair (kan dit, maar doet het niet vaak / niet het liefst)")
+      );
+
       checkbox.addEventListener("change", () => {
         uitzonderingenBox.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
           cb.disabled = !checkbox.checked;
           if (!checkbox.checked) cb.checked = false;
         });
+        secundairCheckbox.disabled = !checkbox.checked;
+        if (!checkbox.checked) secundairCheckbox.checked = false;
       });
 
       row.appendChild(label);
       row.appendChild(uitzonderingenBox);
+      row.appendChild(secundairLabel);
       container.appendChild(row);
     });
   }
@@ -1531,6 +1565,7 @@ th { color: var(--muted); font-weight: 600; }
   function getTakenData() {
     const taken = [];
     const takenUitzonderingen = {};
+    const secundaireTaken = [];
     document.querySelectorAll("#employee-taken .taak-row").forEach((row) => {
       const taskKey = row.dataset.task;
       const checkbox = row.querySelector('input[name="taken"]');
@@ -1540,12 +1575,15 @@ th { color: var(--muted); font-weight: 600; }
         row.querySelectorAll('.taak-uitzonderingen-box input[type="checkbox"]:checked')
       ).map((cb) => cb.value);
       if (uitgeslotenDagen.length) takenUitzonderingen[taskKey] = uitgeslotenDagen;
+      const secundairCheckbox = row.querySelector(".taak-secundair-checkbox");
+      if (secundairCheckbox && secundairCheckbox.checked) secundaireTaken.push(taskKey);
     });
-    return { taken, takenUitzonderingen };
+    return { taken, takenUitzonderingen, secundaireTaken };
   }
 
-  function setTakenData(taken, takenUitzonderingen) {
+  function setTakenData(taken, takenUitzonderingen, secundaireTaken) {
     const takenArr = taken || [];
+    const secundaireArr = secundaireTaken || [];
     document.querySelectorAll("#employee-taken .taak-row").forEach((row) => {
       const taskKey = row.dataset.task;
       const checkbox = row.querySelector('input[name="taken"]');
@@ -1556,11 +1594,23 @@ th { color: var(--muted); font-weight: 600; }
         cb.disabled = !checked;
         cb.checked = checked && excludedDays.has(cb.value);
       });
+      const secundairCheckbox = row.querySelector(".taak-secundair-checkbox");
+      if (secundairCheckbox) {
+        secundairCheckbox.disabled = !checked;
+        secundairCheckbox.checked = checked && secundaireArr.includes(taskKey);
+      }
     });
   }
 
   function isTaakUitgeslotenOpDag(emp, task, dayKey) {
     return !!(emp.takenUitzonderingen && emp.takenUitzonderingen[task] && emp.takenUitzonderingen[task].includes(dayKey));
+  }
+
+  // Een secundaire taak kan iemand wel, maar doet diegene niet vaak of niet het liefst —
+  // bij het invullen van het rooster krijgen mensen met deze taak als hoofd-/voorkeurtaak
+  // voorrang boven wie deze taak alleen als secundair heeft.
+  function isSecundaireTaak(emp, task) {
+    return !!(emp.secundaireTaken && emp.secundaireTaken.includes(task));
   }
 
   // Iemand die "hoofdplaat" kan, is per definitie ook geschikt voor de eenvoudigere
@@ -1907,7 +1957,7 @@ th { color: var(--muted); font-weight: 600; }
     e.preventDefault();
     const naam = document.getElementById("employee-naam").value.trim();
     if (!naam) return;
-    const { taken, takenUitzonderingen } = getTakenData();
+    const { taken, takenUitzonderingen, secundaireTaken } = getTakenData();
     const magOpenTotSluit = getMagOpenTotSluit();
     const heeftSleutel = getHeeftSleutel();
     const nooitAlleenBij = getNooitAlleenBij();
@@ -1919,6 +1969,7 @@ th { color: var(--muted); font-weight: 600; }
       emp.naam = naam;
       emp.taken = taken;
       emp.takenUitzonderingen = takenUitzonderingen;
+      emp.secundaireTaken = secundaireTaken;
       emp.magOpenTotSluit = magOpenTotSluit;
       emp.heeftSleutel = heeftSleutel;
       emp.nooitAlleenBij = nooitAlleenBij;
@@ -1932,6 +1983,7 @@ th { color: var(--muted); font-weight: 600; }
         naam,
         taken,
         takenUitzonderingen,
+        secundaireTaken,
         magOpenTotSluit,
         heeftSleutel,
         nooitAlleenBij,
@@ -1955,7 +2007,7 @@ th { color: var(--muted); font-weight: 600; }
     employeeFormVerlof = emp.verlof.slice();
     employeeFormAanvragen = emp.dienstAanvragen.slice();
     document.getElementById("employee-naam").value = emp.naam;
-    setTakenData(emp.taken, emp.takenUitzonderingen);
+    setTakenData(emp.taken, emp.takenUitzonderingen, emp.secundaireTaken);
     setMagOpenTotSluit(emp.magOpenTotSluit);
     setHeeftSleutel(emp.heeftSleutel);
     setNooitAlleenBij(emp.nooitAlleenBij);
@@ -2004,8 +2056,10 @@ th { color: var(--muted); font-weight: 600; }
           emp.taken
             .map((t) => {
               const uitgesloten = (emp.takenUitzonderingen && emp.takenUitzonderingen[t]) || [];
-              const suffix = uitgesloten.length ? ` (niet op: ${uitgesloten.map(dayLabel).join(", ")})` : "";
-              return `<span class="tag">${taskLabel(t)}${suffix}</span>`;
+              const secundairSuffix = isSecundaireTaak(emp, t) ? " (secundair)" : "";
+              const suffix = (uitgesloten.length ? ` (niet op: ${uitgesloten.map(dayLabel).join(", ")})` : "") + secundairSuffix;
+              const tagClass = isSecundaireTaak(emp, t) ? "tag tag-secundair" : "tag";
+              return `<span class="${tagClass}">${taskLabel(t)}${suffix}</span>`;
             })
             .join("") +
             (emp.nooitAlleenBij ? `<span class="tag tag-beschikbaar">nooit alleen: ${taskLabel(emp.nooitAlleenBij)}</span>` : "") ||
@@ -2501,10 +2555,18 @@ th { color: var(--muted); font-weight: 600; }
         (!extraEligibleFn || extraEligibleFn(e));
       // Een openstaande dienstaanvraag voor precies deze taak/datum gaat vóór de gewone
       // eerlijke-verdeling-voorrang.
+      // Wie deze taak als voorkeur-/hoofdtaak heeft, gaat vóór wie hem alleen secundair
+      // (kan het, maar doet het niet vaak/niet het liefst) heeft — behalve bij een expliciete
+      // dienstaanvraag, die altijd voorrang houdt.
+      const isSecundairVoorTaak = (e) =>
+        isSecundaireTaak(e, task) || (task === "assistentplaat" && !e.taken.includes("assistentplaat") && e.taken.includes("hoofdplaat"));
       const byPriorityMetAanvraag = (a, b) => {
         const reqA = heeftDienstaanvraag(a, day, task) ? 0 : 1;
         const reqB = heeftDienstaanvraag(b, day, task) ? 0 : 1;
         if (reqA !== reqB) return reqA - reqB;
+        const secA = isSecundairVoorTaak(a) ? 1 : 0;
+        const secB = isSecundairVoorTaak(b) ? 1 : 0;
+        if (secA !== secB) return secA - secB;
         return byPriority(a, b);
       };
 
@@ -2678,6 +2740,8 @@ th { color: var(--muted); font-weight: 600; }
               let suffix = dagInfo && dagInfo.type === "beschikbaar" ? " (beschikbaar)" : "";
               if (task.key === "assistentplaat" && !emp.taken.includes("assistentplaat") && emp.taken.includes("hoofdplaat")) {
                 suffix += " (als hoofd)";
+              } else if (isSecundaireTaak(emp, task.key)) {
+                suffix += " (secundair)";
               }
               html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
             });
