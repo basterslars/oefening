@@ -1563,6 +1563,16 @@ th { color: var(--muted); font-weight: 600; }
     return !!(emp.takenUitzonderingen && emp.takenUitzonderingen[task] && emp.takenUitzonderingen[task].includes(dayKey));
   }
 
+  // Iemand die "hoofdplaat" kan, is per definitie ook geschikt voor de eenvoudigere
+  // "assistentplaat"-rol. Zo'n medewerker mag dus ook op een assistent-plek worden
+  // ingepland, waardoor er ook 2 hoofdplaat-mensen samen aan de plaat kunnen staan
+  // in plaats van altijd verplicht 1 hoofd + 1 assistent.
+  function employeeCanDoTask(emp, task) {
+    if (emp.taken.includes(task)) return true;
+    if (task === "assistentplaat" && emp.taken.includes("hoofdplaat")) return true;
+    return false;
+  }
+
   function buildDagenRows(container, items, groupName) {
     container.innerHTML = "";
     items.forEach((item) => {
@@ -2483,7 +2493,7 @@ th { color: var(--muted); font-weight: 600; }
       const conflicts = (candidate, chosenSoFar) =>
         chosenSoFar.some((c) => pairs.some((p) => p.includes(c.id) && p.includes(candidate.id)));
       const eligible = (e) =>
-        e.taken.includes(task) &&
+        employeeCanDoTask(e, task) &&
         !isTaakUitgeslotenOpDag(e, task, day.key) &&
         e.dagen[day.key] &&
         !hasFullDayVerlof(e, day.dateIso) &&
@@ -2589,7 +2599,7 @@ th { color: var(--muted); font-weight: 600; }
         const taskEntries = Object.entries(dayReqs).filter(([, count]) => count > 0);
         const totalPool = (task) =>
           employees.filter(
-            (e) => e.taken.includes(task) && !isTaakUitgeslotenOpDag(e, task, day.key) && e.dagen[day.key] && !hasFullDayVerlof(e, day.dateIso)
+            (e) => employeeCanDoTask(e, task) && !isTaakUitgeslotenOpDag(e, task, day.key) && e.dagen[day.key] && !hasFullDayVerlof(e, day.dateIso)
           ).length;
         // Meest schaarse taak (minste kandidaten t.o.v. behoefte) eerst toewijzen.
         taskEntries.sort((a, b) => (totalPool(a[0]) - a[1]) - (totalPool(b[0]) - b[1]));
@@ -2619,7 +2629,7 @@ th { color: var(--muted); font-weight: 600; }
   // ---------- Schedule rendering ----------
 
   function employeesForTask(task) {
-    return employees.filter((e) => e.taken.includes(task)).sort((a, b) => a.naam.localeCompare(b.naam));
+    return employees.filter((e) => employeeCanDoTask(e, task)).sort((a, b) => a.naam.localeCompare(b.naam));
   }
 
   function renderScheduleTable() {
@@ -2665,7 +2675,10 @@ th { color: var(--muted); font-weight: 600; }
             employeesForTask(task.key).forEach((emp) => {
               const selected = emp.id === currentId ? "selected" : "";
               const dagInfo = emp.dagen[day.key];
-              const suffix = dagInfo && dagInfo.type === "beschikbaar" ? " (beschikbaar)" : "";
+              let suffix = dagInfo && dagInfo.type === "beschikbaar" ? " (beschikbaar)" : "";
+              if (task.key === "assistentplaat" && !emp.taken.includes("assistentplaat") && emp.taken.includes("hoofdplaat")) {
+                suffix += " (als hoofd)";
+              }
               html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
             });
             html += `</select>`;
@@ -2850,7 +2863,7 @@ th { color: var(--muted); font-weight: 600; }
         (day) =>
           e.dagen[day.key] &&
           !hasFullDayVerlof(e, day.dateIso) &&
-          e.taken.some((t) => getCellGroups(requirementsSnapshot[day.key], t).length > 0)
+          TASKS.some((t) => employeeCanDoTask(e, t.key) && getCellGroups(requirementsSnapshot[day.key], t.key).length > 0)
       ).length;
       if (potentieleDagen >= MIN_SHIFTS_PER_WEEK) {
         warnings.push(
@@ -3015,7 +3028,7 @@ th { color: var(--muted); font-weight: 600; }
     });
 
     const inzetbaar = employees.filter(
-      (e) => e.dagen[day.key] && e.taken.some((t) => getCellGroups(dayReqs, t).length > 0)
+      (e) => e.dagen[day.key] && TASKS.some((t) => employeeCanDoTask(e, t.key) && getCellGroups(dayReqs, t.key).length > 0)
     );
     const vrijCount = inzetbaar.filter((e) => hasFullDayVerlof(e, day.dateIso)).length;
     const beschikbaar = inzetbaar.length - vrijCount;
