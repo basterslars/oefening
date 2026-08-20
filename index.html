@@ -3,3203 +3,1140 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Werkrooster Kwalitaria Harte Vier</title>
+<title>Habit Tracker</title>
 <style>
-:root {
-  --bg: #f6f5f1;
-  --panel-bg: #ffffff;
-  --text: #232323;
-  --muted: #6b6b6b;
-  --border: #e2ddd6;
-  --accent: #c8102e;
-  --accent-dark: #96081f;
-  --secondary: #4b5320;
-  --secondary-dark: #363c17;
-  --danger: #c0392b;
-  --danger-bg: #fdecea;
-  --ok: #2e7d32;
-  --warn: #a06a00;
-  --warn-bg: #fdf1da;
-}
-
-@media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1c1a18;
-    --panel-bg: #262320;
-    --text: #f1ede8;
-    --muted: #a9a29a;
-    --border: #3a352f;
-    --accent: #e2364f;
-    --accent-dark: #ef6a7d;
-    --secondary: #7c8a3f;
-    --secondary-dark: #a3b357;
-    --danger: #e57368;
-    --danger-bg: #3a2320;
-    --ok: #6fbf73;
-    --warn: #e0b050;
-    --warn-bg: #3a3018;
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-raised: #ffffff;
+    --text: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --border: #e1e0d9;
+    --border-strong: #c3c2b7;
+    --ring: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --accent-strong: #256abf;
+    --good: #0ca30c;
+    --good-bg: #e5f6e5;
+    --shadow: 0 1px 2px rgba(11,11,11,0.04), 0 6px 20px rgba(11,11,11,0.06);
+
+    --slot-1: #2a78d6; /* blue */
+    --slot-2: #eb6834; /* orange */
+    --slot-3: #1baf7a; /* aqua */
+    --slot-4: #eda100; /* yellow */
+    --slot-5: #e87ba4; /* magenta */
+    --slot-6: #008300; /* green */
+    --slot-7: #4a3aa7; /* violet */
+    --slot-8: #e34948; /* red */
   }
-}
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --surface-raised: #202020;
+      --text: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --border: #2c2c2a;
+      --border-strong: #383835;
+      --ring: rgba(255,255,255,0.10);
+      --accent: #3987e5;
+      --accent-strong: #3987e5;
+      --good: #0ca30c;
+      --good-bg: rgba(12,163,12,0.16);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 24px rgba(0,0,0,0.4);
 
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-}
-
-.topbar {
-  background: var(--panel-bg);
-  border-bottom: 1px solid var(--border);
-  border-top: 4px solid var(--accent);
-  padding: 1rem 1.5rem 0;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.topbar h1 {
-  margin: 0 0 0.75rem;
-  font-size: 1.3rem;
-  color: var(--accent);
-}
-
-.topbar h1 .brand-secondary {
-  color: var(--secondary);
-}
-
-.tabs {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.tab-btn {
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  padding: 0.6rem 1rem;
-  font-size: 0.95rem;
-  cursor: pointer;
-  color: var(--muted);
-}
-
-.tab-btn.active {
-  color: var(--accent-dark);
-  border-bottom-color: var(--accent);
-  font-weight: 600;
-}
-
-main {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1.5rem;
-}
-
-.tab-content { display: none; }
-.tab-content.active { display: block; }
-
-.panel {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1.25rem 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.panel h2 {
-  margin-top: 0;
-  font-size: 1.05rem;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-label {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin-bottom: 0.9rem;
-}
-
-input[type="text"], input[type="date"], input[type="week"], input[type="number"] {
-  display: block;
-  margin-top: 0.3rem;
-  width: 100%;
-  max-width: 320px;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 0.95rem;
-}
-
-fieldset {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-bottom: 1rem;
-}
-
-legend {
-  font-size: 0.85rem;
-  color: var(--muted);
-  padding: 0 0.4rem;
-}
-
-.checkbox-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.2rem;
-}
-
-.checkbox-grid label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.4rem;
-  font-size: 0.9rem;
-  color: var(--text);
-}
-
-.checkbox-grid input { margin: 0; width: auto; }
-
-.taken-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.taak-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.9rem;
-  flex-wrap: wrap;
-}
-
-.taak-uitzonderingen-box {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  padding-left: 0.5rem;
-  border-left: 2px solid var(--border);
-}
-
-.taak-uitzonderingen-hint {
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-
-.taak-secundair-label {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  color: var(--muted);
-  padding-left: 0.5rem;
-  border-left: 2px solid var(--border);
-}
-
-.tag.tag-secundair {
-  border-style: dashed;
-  color: var(--muted);
-}
-
-.fieldset-hint {
-  margin: 0 0 0.7rem;
-  font-size: 0.82rem;
-  color: var(--muted);
-}
-
-.dagen-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  align-items: start;
-  margin-bottom: 1rem;
-}
-
-@media (max-width: 700px) {
-  .dagen-columns {
-    grid-template-columns: 1fr;
+      --slot-1: #3987e5;
+      --slot-2: #d95926;
+      --slot-3: #199e70;
+      --slot-4: #c98500;
+      --slot-5: #d55181;
+      --slot-6: #008300;
+      --slot-7: #9085e9;
+      --slot-8: #e66767;
+    }
   }
-}
-
-.dagen-columns fieldset {
-  margin-bottom: 0;
-  min-width: 0;
-}
-
-.dagen-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.dag-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.9rem;
-  flex-wrap: wrap;
-}
-
-.dag-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0;
-  min-width: 110px;
-  font-size: 0.9rem;
-  color: var(--text);
-}
-
-.dag-checkbox-label input { margin: 0; width: auto; }
-
-.tijdsloten-box {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding-left: 0.5rem;
-  border-left: 2px solid var(--border);
-}
-
-.tijdslot-option {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--text);
-}
-
-.tijdslot-option input { margin: 0; width: auto; }
-
-.tijdslot-option input:disabled {
-  cursor: not-allowed;
-}
-
-.tijdslot-option:has(input:disabled) {
-  color: var(--muted);
-  opacity: 0.6;
-}
-
-.contract-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-  color: var(--text);
-  margin-bottom: 0.7rem;
-}
-.contract-checkbox-label input { margin: 0; width: auto; }
-
-.contract-fields {
-  display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.contract-fields label {
-  margin-bottom: 0;
-}
-
-.contract-fields input, .contract-fields select {
-  max-width: 160px;
-}
-
-.verlof-input-row {
-  display: flex;
-  gap: 0.9rem;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  margin-bottom: 0.6rem;
-}
-
-.verlof-input-row input { margin: 0; }
-
-.verlof-inline-label {
-  margin: 0;
-  font-size: 0.78rem;
-}
-
-.verlof-inline-label input, .verlof-inline-label select {
-  margin-top: 0.2rem;
-  max-width: 150px;
-}
-
-.verlof-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.verlof-list li {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.verlof-list button {
-  background: none;
-  border: none;
-  color: var(--danger);
-  cursor: pointer;
-  font-size: 0.9rem;
-  padding: 0;
-  line-height: 1;
-}
-
-.form-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-button.btn-primary, button.btn-secondary, .file-label {
-  border-radius: 6px;
-  padding: 0.55rem 1.1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  border: 1px solid transparent;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-.btn-primary:hover { background: var(--accent-dark); }
-
-.btn-secondary {
-  background: transparent;
-  color: var(--secondary-dark);
-  border-color: var(--secondary);
-}
-.btn-secondary:hover { background: var(--bg); }
-
-.file-label {
-  display: inline-flex;
-  align-items: center;
-}
-
-.io-buttons { display: flex; gap: 0.6rem; }
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-th, td {
-  text-align: left;
-  padding: 0.55rem 0.6rem;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-
-th { color: var(--muted); font-weight: 600; }
-
-.table-scroll {
-  overflow-x: auto;
-}
-
-.empty-msg { color: var(--muted); font-size: 0.9rem; }
-
-.tag {
-  display: inline-block;
-  background: var(--bg);
-  border: 1px solid var(--secondary);
-  color: var(--secondary-dark);
-  border-radius: 999px;
-  padding: 0.1rem 0.55rem;
-  font-size: 0.78rem;
-  margin: 0.1rem 0.2rem 0.1rem 0;
-}
-
-.tag.tag-beschikbaar {
-  border-style: dashed;
-  color: var(--muted);
-}
-
-.capaciteit-badge {
-  display: inline-block;
-  border-radius: 6px;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.capaciteit-badge.capaciteit-vol {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid var(--danger);
-}
-
-.capaciteit-badge.capaciteit-krap {
-  background: var(--warn-bg);
-  color: var(--warn);
-  border: 1px solid var(--warn);
-}
-
-.capaciteit-badge.capaciteit-ok {
-  color: var(--muted);
-  font-weight: 400;
-}
-
-#verlof-overview-table tr.dag-vol {
-  background: var(--danger-bg);
-}
-
-#verlof-overview-table tr.dag-krap {
-  background: var(--warn-bg);
-}
-
-.row-actions button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 0.85rem;
-  color: var(--accent-dark);
-  margin-right: 0.5rem;
-}
-.row-actions button.delete { color: var(--danger); }
-
-.rooster-controls {
-  display: flex;
-  align-items: flex-end;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.rooster-controls label { margin-bottom: 0; }
-
-.warnings-box {
-  margin-top: 1rem;
-  background: var(--danger-bg);
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-  font-size: 0.88rem;
-}
-
-.warnings-box ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
-
-.saved-msg { color: var(--ok); font-size: 0.88rem; }
-
-.saldo-tekort { color: var(--danger); font-weight: 600; }
-.saldo-overschot { color: var(--ok); }
-
-#requirements-table input[type="number"] {
-  width: 70px;
-  max-width: 70px;
-}
-
-#schedule-table th, #schedule-table td {
-  min-width: 130px;
-}
-
-#schedule-table select {
-  width: 100%;
-  padding: 0.3rem;
-  border-radius: 5px;
-  border: 1px solid var(--border);
-  background: var(--panel-bg);
-  color: var(--text);
-  font-size: 0.85rem;
-  margin-bottom: 0.3rem;
-}
-
-#schedule-table select.on-verlof {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-#schedule-table select.not-fixed-day {
-  border-style: dashed;
-}
-
-#schedule-table select.beschikbaar {
-  border-color: var(--secondary);
-  color: var(--secondary-dark);
-}
-
-#schedule-table select.onervaren {
-  border-color: var(--danger);
-  border-style: dashed;
-  color: var(--danger);
-}
-
-#schedule-table td.understaffed {
-  background: var(--danger-bg);
-}
-
-#schedule-table .slot-empty-option {
-  color: var(--muted);
-}
-
-.period-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--secondary-dark);
-  margin: 0.3rem 0 0.2rem;
-}
-
-.period-label:first-child {
-  margin-top: 0;
-}
-
-.tijdslot-badge {
-  font-size: 0.78rem;
-  color: var(--muted);
-  margin: -0.15rem 0 0.4rem;
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  padding: 0.1rem 0.25rem;
-  font-family: inherit;
-}
-
-.tijdslot-badge:hover:not(:disabled),
-.tijdslot-badge:focus {
-  border-color: var(--border);
-  background: var(--bg);
-}
-
-.tijdslot-badge:disabled {
-  opacity: 0.5;
-}
-
-.tijdslot-badge.tijdslot-missing {
-  color: var(--danger);
-}
-
-.tijdslot-badge.tijdslot-overridden {
-  color: var(--secondary-dark);
-  font-weight: 600;
-  border-color: var(--border);
-  background: var(--bg);
-}
-
-#open-sluit-table textarea {
-  width: 100%;
-  min-width: 180px;
-  font-family: inherit;
-  font-size: 0.85rem;
-  padding: 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-  resize: vertical;
-}
-
-#open-sluit-table input[type="number"] {
-  width: 70px;
-}
-
-#open-sluit-table td, #open-sluit-table th {
-  vertical-align: top;
-}
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-raised: #202020;
+    --text: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --border: #2c2c2a;
+    --border-strong: #383835;
+    --ring: rgba(255,255,255,0.10);
+    --accent: #3987e5;
+    --accent-strong: #3987e5;
+    --good: #0ca30c;
+    --good-bg: rgba(12,163,12,0.16);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 24px rgba(0,0,0,0.4);
+
+    --slot-1: #3987e5;
+    --slot-2: #d95926;
+    --slot-3: #199e70;
+    --slot-4: #c98500;
+    --slot-5: #d55181;
+    --slot-6: #008300;
+    --slot-7: #9085e9;
+    --slot-8: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    background: linear-gradient(155deg, var(--accent) 0%, var(--slot-7) 100%);
+    border-radius: 20px;
+    padding: 24px 24px 22px;
+    color: #ffffff;
+    box-shadow: var(--shadow);
+  }
+  .hero-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .hero-top h1 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .icon-btn {
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.28);
+    color: #fff;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s ease;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.3); }
+
+  .hero-date { margin-top: 14px; }
+  .hero-date-weekday {
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-transform: capitalize;
+  }
+  .hero-date-full {
+    font-size: 0.92rem;
+    opacity: 0.9;
+    margin-top: 2px;
+  }
+
+  .hero-progress {
+    margin-top: 18px;
+    background: rgba(255,255,255,0.16);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .hero-progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.88rem;
+    margin-bottom: 8px;
+  }
+  .hero-progress-row strong { font-size: 1rem; }
+  .hero-progress-track {
+    height: 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.25);
+    overflow: hidden;
+  }
+  .hero-progress-fill {
+    height: 100%;
+    border-radius: 6px;
+    background: #ffffff;
+    transition: width .3s ease;
+  }
+
+  /* ---------- Cards ---------- */
+  .card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .card-header h2 { margin: 0; }
+
+  /* ---------- Add habit ---------- */
+  #addHabitForm {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+  #habitNameInput {
+    flex: 1 1 200px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  #habitNameInput:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+  .color-picker {
+    display: flex;
+    gap: 6px;
+  }
+  .swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.75rem;
+  }
+  .swatch[aria-pressed="true"] {
+    border-color: var(--text);
+    transform: scale(1.08);
+  }
+  .add-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .add-btn:hover { background: var(--accent-strong); }
+
+  /* ---------- Today list ---------- */
+  .today-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .habit-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 8px;
+    border-radius: 12px;
+    transition: background .15s ease;
+  }
+  .habit-row:hover { background: var(--surface); }
+  .check-btn {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    border: 2px solid var(--border-strong);
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    transition: background .15s ease, border-color .15s ease, transform .1s ease;
+  }
+  .check-btn:active { transform: scale(0.92); }
+  .check-btn[aria-pressed="true"] {
+    background: var(--check-color, var(--good));
+    border-color: var(--check-color, var(--good));
+  }
+  .dot {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--dot-color, var(--accent));
+  }
+  .habit-name {
+    flex: 1 1 auto;
+    font-size: 0.95rem;
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .streak-badge {
+    flex: 0 0 auto;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .delete-btn {
+    flex: 0 0 auto;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: background .15s ease, color .15s ease;
+  }
+  .delete-btn:hover { background: color-mix(in srgb, #e34948 14%, transparent); color: #e34948; }
+  .delete-btn.confirming {
+    background: #e34948;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.72rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 18px 8px;
+    margin: 0;
+  }
+
+  /* ---------- Week table ---------- */
+  .week-scroll { overflow-x: auto; }
+  #weekTable {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 480px;
+  }
+  #weekTable th, #weekTable td {
+    text-align: center;
+    padding: 6px 4px;
+  }
+  #weekTable th {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  #weekTable th.today-col { color: var(--accent); }
+  #weekTable td.habit-label {
+    text-align: left;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding-right: 10px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .week-cell-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .week-cell-btn[aria-pressed="true"] {
+    background: var(--check-color, var(--accent));
+    border-color: var(--check-color, var(--accent));
+  }
+  .week-cell-btn[disabled] {
+    cursor: default;
+    opacity: 0.35;
+    background: repeating-linear-gradient(45deg, var(--border), var(--border) 2px, transparent 2px, transparent 5px);
+  }
+  .week-cell-btn.is-today-col { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+
+  /* ---------- Year heatmaps ---------- */
+  .habits-year-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .year-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+  }
+  .year-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .year-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  .year-nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .year-stats {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 10px 0 14px;
+  }
+  .year-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .year-stat-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .year-stat-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .heatmap-inner { display: inline-flex; flex-direction: column; gap: 4px; }
+  .heatmap-months {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 12px;
+    gap: 3px;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-left: 20px;
+  }
+  .heatmap-body { display: flex; gap: 3px; }
+  .heatmap-daylabels {
+    display: grid;
+    grid-template-rows: repeat(7, 12px);
+    gap: 3px;
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    width: 16px;
+    text-align: right;
+    line-height: 12px;
+  }
+  .heatmap-grid {
+    display: grid;
+    grid-template-rows: repeat(7, 12px);
+    grid-auto-flow: column;
+    grid-auto-columns: 12px;
+    gap: 3px;
+  }
+  .heat-cell {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: none;
+    padding: 0;
+    background: var(--border);
+    cursor: pointer;
+  }
+  .heat-cell:hover { outline: 2px solid var(--text-muted); outline-offset: 1px; }
+  .heat-cell[data-checked="1"] { background: var(--heat-color, var(--accent)); }
+  .heat-cell[data-future="1"] {
+    cursor: default;
+    background: transparent;
+    border: 1px dashed var(--border);
+  }
+  .heat-cell[data-empty="1"] { background: transparent; cursor: default; }
+
+  .heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+  .legend-swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    background: var(--border);
+  }
+  .legend-swatch.on { background: var(--heat-color, var(--accent)); }
+
+  .empty-app-state {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 30px 10px;
+  }
+
+  @media (max-width: 480px) {
+    .hero-top h1 { font-size: 1.15rem; }
+    .hero-date-weekday { font-size: 1.25rem; }
+  }
 </style>
 </head>
 <body>
-<header class="topbar">
-  <h1>🍟 Werkrooster <span class="brand-secondary">Kwalitaria Harte Vier</span></h1>
-  <nav class="tabs">
-    <button class="tab-btn active" data-tab="medewerkers">Medewerkers</button>
-    <button class="tab-btn" data-tab="bezetting">Bezetting</button>
-    <button class="tab-btn" data-tab="rooster">Rooster</button>
-    <button class="tab-btn" data-tab="vrijvraging">Vrijvraging</button>
-  </nav>
-</header>
+<div class="app">
 
-<main>
-  <!-- MEDEWERKERS TAB -->
-  <section id="tab-medewerkers" class="tab-content active">
-    <div class="panel">
-      <h2 id="employee-form-title">Nieuwe medewerker</h2>
-      <form id="employee-form">
-        <input type="hidden" id="employee-id">
-        <label>
-          Naam
-          <input type="text" id="employee-naam" required placeholder="Bijv. Jan">
-        </label>
-
-        <fieldset>
-          <legend>Takenpakket</legend>
-          <p class="fieldset-hint">Vink de taken aan die iemand kan doen. Is iemand op sommige dagen nog niet ervaren genoeg voor een taak (bijv. wel kassa op een rustige dinsdag, maar niet op een drukke vrijdag)? Vink dan bij die taak aan op welke dagen dat (nog) niet kan — de generator houdt daar rekening mee.</p>
-          <div id="employee-taken" class="taken-list"></div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Openen &amp; sluiten</legend>
-          <label class="contract-checkbox-label">
-            <input type="checkbox" id="employee-mag-open-tot-sluit">
-            Mag van openen tot sluiten werken (uitzondering — bepaalt of de "openen tot sluit"-tijdopties hieronder aanvinkbaar zijn)
-          </label>
-          <label class="contract-checkbox-label">
-            <input type="checkbox" id="employee-heeft-sleutel">
-            Heeft een sleutel (leidinggevende die de zaak kan afsluiten)
-          </label>
-          <p class="fieldset-hint">Bij het sluiten zorgt de generator dat er minstens 1 sleutelhouder in de sluitploeg staat, en waarschuwt als dat niet lukt.</p>
-        </fieldset>
-
-        <fieldset>
-          <legend>Leidinggevende</legend>
-          <p class="fieldset-hint">Voor bijv. een leidinggevende die overzicht houdt en af en toe moet kunnen bijspringen: kies een taak waarop deze persoon nooit als enige mag staan (er moet dan altijd nog iemand anders bij staan).</p>
-          <label>
-            Nooit alleen bij taak
-            <select id="employee-nooit-alleen-bij"></select>
-          </label>
-        </fieldset>
-
-        <p class="fieldset-hint">Vink per dag aan of iemand vast werkt of alleen beschikbaar is (nooit allebei voor dezelfde dag), en kies daarna een of meer tijdopties (zie Bezetting-tab om de opties per dag aan te passen). De twee kolommen hieronder vul je gewoon naast elkaar in — vaste dagen in de linkerkolom, de overige beschikbare dagen in de rechter.</p>
-        <div class="dagen-columns">
-          <fieldset>
-            <legend>Vaste werkdagen</legend>
-            <div id="employee-vaste-dagen" class="dagen-list"></div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Beschikbaar om te werken</legend>
-            <div id="employee-beschikbaar-dagen" class="dagen-list"></div>
-          </fieldset>
-        </div>
-
-        <fieldset>
-          <legend>Vast contract</legend>
-          <p class="fieldset-hint">Geef aan of deze medewerker een vast contract heeft en hoeveel uur dat is. Komt iemand een week/maand niet aan de contracturen, dan telt het tekort automatisch mee bij het genereren van de volgende periode.</p>
-          <label class="contract-checkbox-label">
-            <input type="checkbox" id="employee-contract-vast">
-            Heeft een vast contract
-          </label>
-          <div class="contract-fields">
-            <label>
-              Aantal uur
-              <input type="number" id="employee-contract-uren" min="0" step="0.5" disabled>
-            </label>
-            <label>
-              Periode
-              <select id="employee-contract-periode" disabled>
-                <option value="week">Per week</option>
-                <option value="maand">Per maand</option>
-              </select>
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Verlof aangevraagd</legend>
-          <p class="fieldset-hint">
-            Vrij vragen kan voor één dag of voor een hele periode (vul ook "t/m" in voor bijv. een week vrij), en per
-            dag voor de hele dag of een deel ervan (bijv. "vanaf 16:30 vrij" — kan dan die dag nog wel tot 16:30 werken).
-          </p>
-          <div class="verlof-input-row">
-            <label class="verlof-inline-label">
-              Van
-              <input type="date" id="employee-verlof-datum">
-            </label>
-            <label class="verlof-inline-label">
-              T/m (optioneel, voor een periode)
-              <input type="date" id="employee-verlof-datum-tot">
-            </label>
-            <label class="verlof-inline-label">
-              Type
-              <select id="employee-verlof-type">
-                <option value="hele_dag">Hele dag</option>
-                <option value="vanaf">Vanaf tijdstip vrij</option>
-                <option value="tot">Tot tijdstip vrij</option>
-              </select>
-            </label>
-            <label class="verlof-inline-label">
-              Tijdstip
-              <input type="time" id="employee-verlof-tijd" hidden>
-            </label>
-            <button type="button" id="add-verlof-btn" class="btn-secondary">+ Toevoegen</button>
-          </div>
-          <ul id="employee-verlof-list" class="verlof-list"></ul>
-        </fieldset>
-
-        <fieldset>
-          <legend>Dienst aanvragen</legend>
-          <p class="fieldset-hint">Wil iemand juist graag een specifieke dienst werken (bijv. kassa op een bepaalde datum)? Zet dat hier neer — de generator geeft zo'n aanvraag voorrang boven de gewone eerlijke verdeling.</p>
-          <div class="verlof-input-row">
-            <label class="verlof-inline-label">
-              Datum
-              <input type="date" id="employee-aanvraag-datum">
-            </label>
-            <label class="verlof-inline-label">
-              Taak
-              <select id="employee-aanvraag-taak"></select>
-            </label>
-            <button type="button" id="add-aanvraag-btn" class="btn-secondary">+ Toevoegen</button>
-          </div>
-          <ul id="employee-aanvraag-list" class="verlof-list"></ul>
-        </fieldset>
-
-        <div class="form-actions">
-          <button type="submit" class="btn-primary">Opslaan</button>
-          <button type="button" id="employee-cancel-btn" class="btn-secondary" hidden>Annuleren</button>
-        </div>
-      </form>
+  <header class="hero">
+    <div class="hero-top">
+      <h1>Habit Tracker</h1>
+      <button id="themeToggle" class="icon-btn" aria-label="Wissel licht/donker thema" title="Wissel thema">🌓</button>
     </div>
-
-    <div class="panel">
-      <div class="panel-header">
-        <h2>Medewerkers overzicht</h2>
-        <div class="io-buttons">
-          <button id="export-btn" class="btn-secondary">Exporteer JSON</button>
-          <label class="btn-secondary file-label">
-            Importeer JSON
-            <input type="file" id="import-input" accept="application/json" hidden>
-          </label>
-        </div>
+    <div class="hero-date">
+      <div class="hero-date-weekday" id="todayWeekday">&nbsp;</div>
+      <div class="hero-date-full" id="todayFull">&nbsp;</div>
+    </div>
+    <div class="hero-progress">
+      <div class="hero-progress-row">
+        <span>Vandaag afgevinkt</span>
+        <strong id="heroProgressText">0 / 0</strong>
       </div>
-      <table id="employee-table">
-        <thead>
-          <tr>
-            <th>Naam</th>
-            <th>Takenpakket</th>
-            <th>Vaste dagen</th>
-            <th>Beschikbaar</th>
-            <th>Contract</th>
-            <th>Verlof</th>
-            <th>Dienstaanvragen</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="employee-tbody"></tbody>
-      </table>
-      <p id="employee-empty-msg" class="empty-msg" hidden>Nog geen medewerkers toegevoegd.</p>
+      <div class="hero-progress-track">
+        <div class="hero-progress-fill" id="heroProgressFill" style="width:0%"></div>
+      </div>
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>Nieuwe gewoonte</h2>
+    <form id="addHabitForm" autocomplete="off">
+      <input id="habitNameInput" type="text" placeholder="bv. 10.000 stappen zetten" maxlength="40" required />
+      <div class="color-picker" id="colorPicker"></div>
+      <button type="submit" class="add-btn">Toevoegen</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-header"><h2>Vandaag</h2></div>
+    <ul class="today-list" id="todayList"></ul>
+    <p class="empty-state" id="emptyState" hidden>Nog geen gewoontes toegevoegd. Voeg er hierboven één toe om te beginnen.</p>
+  </section>
+
+  <section class="card" id="weekCard" hidden>
+    <h2>Deze week</h2>
+    <div class="week-scroll">
+      <table id="weekTable"></table>
     </div>
   </section>
 
-  <!-- BEZETTING TAB -->
-  <section id="tab-bezetting" class="tab-content">
-    <div class="panel">
-      <h2>Openen &amp; sluiten</h2>
-      <p class="fieldset-hint">
-        Tijdopties (1 per regel, bijv. "16:30 - 20:00" of "17:00 - sluit") bepalen welke keuzes medewerkers straks kunnen
-        aanvinken bij hun werkdagen. Openers (1 per regel, bijv. "10:30,2" = 2 mensen om 10:30) en aantal sluiters
-        bepalen hoeveel mensen er op elk moment moeten openen/sluiten; de generator vult dit automatisch in.
-        "Sluitingstijd" is alleen voor de urenberekening — op het rooster zelf blijft "sluit" gewoon "sluit" staan.
-      </p>
-      <label>
-        Sluitingstijd (voor urenberekening)
-        <input type="time" id="sluitingstijd-input">
-      </label>
-      <div class="table-scroll">
-        <table id="open-sluit-table">
-          <thead>
-            <tr>
-              <th>Dag</th>
-              <th>Tijdopties</th>
-              <th>Openers</th>
-              <th>Aantal sluiters</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div class="form-actions">
-        <button id="save-open-sluit-btn" class="btn-primary">Opslaan</button>
-        <span id="open-sluit-saved-msg" class="saved-msg" hidden>Opgeslagen ✓</span>
-      </div>
-    </div>
+  <section class="habits-year-section" id="yearSection"></section>
 
-    <div class="panel">
-      <h2>Onmogelijke combinaties</h2>
-      <p class="fieldset-hint">Kies een taak en twee medewerkers die nooit tegelijk op die taak mogen staan (bijv. twee onervaren mensen niet samen aan de kassa).</p>
-      <div class="contract-fields">
-        <label>
-          Taak
-          <select id="forbidden-task"></select>
-        </label>
-        <label>
-          Medewerker 1
-          <select id="forbidden-emp-a"></select>
-        </label>
-        <label>
-          Medewerker 2
-          <select id="forbidden-emp-b"></select>
-        </label>
-      </div>
-      <div class="form-actions">
-        <button id="add-forbidden-pair-btn" class="btn-primary">Toevoegen</button>
-      </div>
-      <ul id="forbidden-pairs-list" class="verlof-list"></ul>
-    </div>
-
-    <div class="panel">
-      <div class="panel-header">
-        <h2>Benodigde bezetting per dag</h2>
-        <button id="reset-requirements-btn" class="btn-secondary">Herstel standaard</button>
-      </div>
-      <p class="fieldset-hint">Een dag met een omslagtijd hieronder is opgesplitst in middagspits en avondspits, elk met een eigen bezetting per taak.</p>
-      <div id="requirements-omslag-area"></div>
-      <div class="table-scroll">
-        <table id="requirements-table">
-          <thead>
-            <tr>
-              <th>Taak</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div class="form-actions">
-        <button id="save-requirements-btn" class="btn-primary">Bezetting opslaan</button>
-        <span id="requirements-saved-msg" class="saved-msg" hidden>Opgeslagen ✓</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- ROOSTER TAB -->
-  <section id="tab-rooster" class="tab-content">
-    <div class="panel">
-      <h2>Rooster genereren</h2>
-      <div class="rooster-controls">
-        <label>
-          Week
-          <input type="week" id="week-picker">
-        </label>
-        <button id="generate-btn" class="btn-primary">Genereer rooster</button>
-      </div>
-      <div id="warnings-box" class="warnings-box" hidden></div>
-    </div>
-
-    <div class="panel" id="contract-progress-panel" hidden>
-      <h2>Contracturen deze week</h2>
-      <div class="table-scroll">
-        <table id="contract-progress-table">
-          <thead>
-            <tr>
-              <th>Naam</th>
-              <th>Doel deze week</th>
-              <th>Gewerkt deze week</th>
-              <th>Saldo</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="table-scroll">
-        <table id="schedule-table"></table>
-      </div>
-      <p id="schedule-empty-msg" class="empty-msg">Nog geen rooster gegenereerd voor deze week.</p>
-    </div>
-  </section>
-
-  <!-- VRIJVRAGING TAB -->
-  <section id="tab-vrijvraging" class="tab-content">
-    <div class="panel">
-      <h2>Wie heeft er vrij gevraagd?</h2>
-      <p class="fieldset-hint">Overzicht per dag van deze week van wie er verlof heeft aangevraagd, zodat je meteen ziet wie niet in het rooster mag komen.</p>
-      <div class="rooster-controls">
-        <label>
-          Week
-          <input type="week" id="verlof-week-picker">
-        </label>
-      </div>
-      <div class="table-scroll">
-        <table id="verlof-overview-table"></table>
-      </div>
-      <p id="verlof-overview-empty" class="empty-msg" hidden>Niemand heeft vrij gevraagd deze week.</p>
-    </div>
-
-    <div class="panel">
-      <h2>Dienstaanvragen deze week</h2>
-      <p class="fieldset-hint">Wie een specifieke dienst heeft aangevraagd, en of die aanvraag in het (laatst gegenereerde) rooster is gehonoreerd.</p>
-      <div class="table-scroll">
-        <table id="aanvraag-overview-table"></table>
-      </div>
-      <p id="aanvraag-overview-empty" class="empty-msg" hidden>Niemand heeft deze week een dienst aangevraagd.</p>
-    </div>
-  </section>
-</main>
+</div>
 
 <script>
 (function () {
   "use strict";
 
-  // ---------- Static config ----------
+  var STORAGE_HABITS = "habits_v1";
+  var STORAGE_CHECKS = "checks_v1";
+  var STORAGE_THEME = "theme_v1";
 
-  const TASKS = [
-    { key: "kassa", label: "Kassa" },
-    { key: "friet", label: "Friet" },
-    { key: "snack", label: "Snack" },
-    { key: "hoofdplaat", label: "Hoofd plaat" },
-    { key: "assistentplaat", label: "Assistent plaat" },
-    { key: "fietsbezorgen", label: "Fietsbezorgen" },
-    { key: "autobezorgen", label: "Autobezorgen" },
-    { key: "vliegende_keep", label: "Vliegende keep" },
+  var COLORS = [
+    { key: "slot-1", var: "--slot-1" },
+    { key: "slot-2", var: "--slot-2" },
+    { key: "slot-3", var: "--slot-3" },
+    { key: "slot-4", var: "--slot-4" },
+    { key: "slot-5", var: "--slot-5" },
+    { key: "slot-6", var: "--slot-6" },
+    { key: "slot-7", var: "--slot-7" },
+    { key: "slot-8", var: "--slot-8" }
   ];
 
-  // Open dinsdag t/m zondag; maandag gesloten.
-  const DAYS = [
-    { key: "dinsdag", label: "Dinsdag", jsDay: 2 },
-    { key: "woensdag", label: "Woensdag", jsDay: 3 },
-    { key: "donderdag", label: "Donderdag", jsDay: 4 },
-    { key: "vrijdag", label: "Vrijdag", jsDay: 5 },
-    { key: "zaterdag", label: "Zaterdag", jsDay: 6 },
-    { key: "zondag", label: "Zondag", jsDay: 0 },
-  ];
+  var WEEKDAYS_LONG = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
+  var WEEKDAYS_SHORT = ["zo", "ma", "di", "wo", "do", "vr", "za"];
+  var MONTHS_LONG = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+  var MONTHS_SHORT = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+  var DAYLABELS_MON_FIRST = ["ma", "di", "wo", "do", "vr", "za", "zo"];
 
-  // Vrijdag is opgesplitst in middagspits/avondspits met een eigen bezetting per periode
-  // (in plaats van één aantal per taak voor de hele dag). Zie isPeriodDag()/getCellGroups().
-  const DEFAULT_REQUIREMENTS = {
-    dinsdag: { kassa: 1, snack: 1, friet: 1, hoofdplaat: 1, vliegende_keep: 1, fietsbezorgen: 2 },
-    woensdag: { kassa: 1, snack: 1, friet: 1, hoofdplaat: 1, vliegende_keep: 1, fietsbezorgen: 2 },
-    donderdag: { kassa: 2, hoofdplaat: 1, assistentplaat: 1, friet: 1, snack: 1, fietsbezorgen: 2 },
-    vrijdag: {
-      omslag: "16:30",
-      middag: { kassa: 1, friet: 1, snack: 1, hoofdplaat: 1, vliegende_keep: 1 },
-      avond: { kassa: 2, friet: 1, snack: 1, hoofdplaat: 1, assistentplaat: 1, fietsbezorgen: 3, autobezorgen: 1 },
-    },
-    zaterdag: { kassa: 2, hoofdplaat: 1, assistentplaat: 1, snack: 1, friet: 1, fietsbezorgen: 3 },
-    zondag: { kassa: 2, hoofdplaat: 1, assistentplaat: 1, friet: 1, snack: 1, fietsbezorgen: 3, autobezorgen: 1 },
-  };
+  // ---------- date helpers (local time, no UTC drift) ----------
+  function toISO(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+  function todayISO() { return toISO(new Date()); }
+  function startOfDay(d) { var n = new Date(d); n.setHours(0, 0, 0, 0); return n; }
+  function addDays(d, n) { var r = new Date(d); r.setDate(r.getDate() + n); return r; }
+  function mondayOf(d) {
+    var dow = (d.getDay() + 6) % 7; // Mon=0..Sun=6
+    return addDays(d, -dow);
+  }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
-  // Tijdopties, openers en aantal sluiters per dag. "Sluit" is een letterlijke waarde
-  // (geen vaste klok tijd) — pas op het rooster gewoon getoond als "sluit".
-  // Zaterdag is een aanname (zelfde patroon als woensdag); via Bezetting > Openen & sluiten aan te passen.
-  const DEFAULT_OPEN_SLUIT = {
-    dinsdag: {
-      tijdsloten: [
-        "14:00 - sluit", "14:00 - 19:30", "16:30 - 19:30",
-        "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
-      ],
-      openers: [{ tijd: "14:00", aantal: 2 }],
-      sluiters: 4,
-    },
-    woensdag: {
-      tijdsloten: [
-        "10:30 - 19:30", "10:30 - sluit", "16:30 - 19:30",
-        "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
-      ],
-      openers: [{ tijd: "10:30", aantal: 2 }],
-      sluiters: 4,
-    },
-    donderdag: {
-      tijdsloten: [
-        "10:30 - 19:30", "10:30 - sluit", "14:00 - sluit", "14:00 - 20:00", "16:30 - 19:30",
-        "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
-      ],
-      openers: [{ tijd: "10:30", aantal: 2 }],
-      sluiters: 4,
-    },
-    vrijdag: {
-      tijdsloten: [
-        "10:00 - 19:30", "10:30 - 19:30", "10:30 - sluit", "11:00 - 20:00", "11:00 - sluit", "11:30 - 14:00",
-        "15:00 - sluit", "15:00 - 20:00", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
-      ],
-      openers: [{ tijd: "10:00", aantal: 2 }, { tijd: "10:30", aantal: 1 }, { tijd: "11:00", aantal: 1 }],
-      sluiters: 4,
-    },
-    zaterdag: {
-      tijdsloten: ["10:30 - 19:30", "10:30 - sluit", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
-      openers: [{ tijd: "10:30", aantal: 2 }],
-      sluiters: 4,
-    },
-    zondag: {
-      tijdsloten: [
-        "10:30 - 19:30", "10:30 - sluit", "14:00 - sluit", "14:00 - 20:00",
-        "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
-      ],
-      openers: [{ tijd: "10:30", aantal: 2 }],
-      sluiters: 4,
-    },
-  };
-  const DEFAULT_SLUITINGSTIJD = "21:00";
-
-  const STORAGE_KEYS = {
-    employees: "friettent_employees",
-    requirements: "friettent_requirements",
-    schedulePrefix: "friettent_schedule_",
-    openSluit: "friettent_open_sluit",
-    sluitingstijd: "friettent_sluitingstijd",
-    forbiddenPairs: "friettent_forbidden_pairs",
-  };
-
-  const MIN_SHIFTS_PER_WEEK = 2;
-  const WEKEN_PER_MAAND = 52 / 12;
-
-  function taskLabel(key) {
-    const t = TASKS.find((t) => t.key === key);
-    return t ? t.label : key;
-  }
-  // Migratie: "bakplaat" is opgesplitst in "hoofdplaat" + "assistentplaat"; oude
-  // verwijzingen naar de taak worden bij het laden omgezet naar "hoofdplaat".
-  function migrateTaskKey(key) {
-    return key === "bakplaat" ? "hoofdplaat" : key;
-  }
-  function dayLabel(key) {
-    const d = DAYS.find((d) => d.key === key);
-    return d ? d.label : key;
-  }
-
-  // Een "dagdeel-dag" (zoals vrijdag) heeft een eigen bezetting per periode (middag/avond)
-  // in plaats van één aantal per taak voor de hele dag.
-  function isPeriodDag(dayReqs) {
-    return !!(dayReqs && (dayReqs.middag || dayReqs.avond));
-  }
-  function periodTaskKey(task, period) {
-    return `${task}__${period}`;
-  }
-  function baseTaskKey(scheduleKey) {
-    return scheduleKey.split("__")[0];
-  }
-  // Geeft, voor een taak op een dag, de groep(en) bezetting terug die daar gelden: bij een
-  // gewone dag is dat er hooguit 1 (de hele dag), bij een dagdeel-dag kunnen dat er 2 zijn
-  // (middagspits + avondspits) — elk met een eigen aantal en een eigen sleutel in het rooster.
-  function getCellGroups(dayReqs, taskKey) {
-    if (isPeriodDag(dayReqs)) {
-      const groups = [];
-      const m = (dayReqs.middag || {})[taskKey] || 0;
-      const a = (dayReqs.avond || {})[taskKey] || 0;
-      if (m > 0) groups.push({ period: "middag", label: "Middagspits", count: m, scheduleKey: periodTaskKey(taskKey, "middag") });
-      if (a > 0) groups.push({ period: "avond", label: "Avondspits", count: a, scheduleKey: periodTaskKey(taskKey, "avond") });
-      return groups;
-    }
-    const count = (dayReqs || {})[taskKey] || 0;
-    return count > 0 ? [{ period: null, label: null, count, scheduleKey: taskKey }] : [];
-  }
-
-  // ---------- Storage helpers ----------
-
-  function normalizeEmployee(emp) {
-    let dagen = {};
-    if (emp.dagen && typeof emp.dagen === "object") {
-      Object.entries(emp.dagen).forEach(([day, entry]) => {
-        if (!entry) return;
-        dagen[day] = {
-          type: entry.type === "beschikbaar" ? "beschikbaar" : "vast",
-          // Migratie: het oudere hele-dag/avondspits-model kende geen concrete tijden,
-          // dus die dagen starten leeg en moeten opnieuw met tijdopties ingevuld worden.
-          tijdsloten: Array.isArray(entry.tijdsloten) ? entry.tijdsloten : [],
-        };
-      });
-    } else if (Array.isArray(emp.vasteDagen)) {
-      // Migratie van een nog ouder formaat (vasteDagen[] + dienstType{}).
-      emp.vasteDagen.forEach((day) => {
-        dagen[day] = { type: "vast", tijdsloten: [] };
-      });
-    }
-    const contract = emp.contract && typeof emp.contract === "object" ? emp.contract : {};
-    // Migratie: verlof was een lijst van datumstrings (altijd hele dag); nu een lijst
-    // van { datum, type: 'hele_dag'|'vanaf'|'tot', tijd } zodat een deel van de dag ook kan.
-    const verlof = Array.isArray(emp.verlof)
-      ? emp.verlof.map((v) => (typeof v === "string" ? { datum: v, type: "hele_dag", tijd: null } : v))
-      : [];
-    const clean = Object.assign({}, emp);
-    delete clean.vasteDagen;
-    delete clean.dienstType;
-    clean.dagen = dagen;
-    clean.verlof = verlof;
-    clean.taken = Array.isArray(emp.taken)
-      ? Array.from(new Set(emp.taken.map(migrateTaskKey).filter((t) => TASKS.some((task) => task.key === t))))
-      : [];
-    // Secundaire taken: kan de medewerker wel, maar doet die niet vaak/niet het liefst —
-    // moet altijd een subset van "taken" blijven.
-    clean.secundaireTaken = Array.isArray(emp.secundaireTaken)
-      ? Array.from(new Set(emp.secundaireTaken.map(migrateTaskKey).filter((t) => clean.taken.includes(t))))
-      : [];
-    clean.magOpenTotSluit = !!emp.magOpenTotSluit;
-    clean.heeftSleutel = !!emp.heeftSleutel;
-    const migratedNooitAlleenBij = emp.nooitAlleenBij ? migrateTaskKey(emp.nooitAlleenBij) : null;
-    clean.nooitAlleenBij = TASKS.some((t) => t.key === migratedNooitAlleenBij) ? migratedNooitAlleenBij : null;
-    const takenUitzonderingen = {};
-    if (emp.takenUitzonderingen && typeof emp.takenUitzonderingen === "object") {
-      Object.entries(emp.takenUitzonderingen).forEach(([taskKeyRaw, dagenLijst]) => {
-        const taskKey = migrateTaskKey(taskKeyRaw);
-        if (!TASKS.some((t) => t.key === taskKey) || !Array.isArray(dagenLijst)) return;
-        const geldigeDagen = dagenLijst.filter((d) => DAYS.some((day) => day.key === d));
-        if (geldigeDagen.length) takenUitzonderingen[taskKey] = geldigeDagen;
-      });
-    }
-    clean.takenUitzonderingen = takenUitzonderingen;
-    clean.dienstAanvragen = Array.isArray(emp.dienstAanvragen)
-      ? emp.dienstAanvragen
-          .map((a) => (a && a.datum ? { datum: a.datum, taak: migrateTaskKey(a.taak) } : null))
-          .filter((a) => a && TASKS.some((t) => t.key === a.taak))
-      : [];
-    clean.contract = {
-      vast: !!contract.vast,
-      uren: typeof contract.uren === "number" && contract.uren > 0 ? contract.uren : 0,
-      periode: contract.periode === "maand" ? "maand" : "week",
-    };
-    return clean;
-  }
-
-  function weeklyTargetHoursFor(emp) {
-    if (!emp.contract || !emp.contract.vast || !emp.contract.uren) return null;
-    return emp.contract.periode === "maand" ? emp.contract.uren / WEKEN_PER_MAAND : emp.contract.uren;
-  }
-
-  function verlofEntryFor(emp, dateIso) {
-    return emp.verlof.find((v) => v.datum === dateIso) || null;
-  }
-  function hasFullDayVerlof(emp, dateIso) {
-    const entry = verlofEntryFor(emp, dateIso);
-    return !!entry && entry.type === "hele_dag";
-  }
-
-  function vasteDagenOf(emp) {
-    return Object.keys(emp.dagen).filter((d) => emp.dagen[d].type === "vast");
-  }
-  function beschikbareDagenOf(emp) {
-    return Object.keys(emp.dagen).filter((d) => emp.dagen[d].type === "beschikbaar");
-  }
-
-  function loadEmployees() {
+  // ---------- storage ----------
+  function loadHabits() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.employees);
-      const list = raw ? JSON.parse(raw) : [];
-      return list.map(normalizeEmployee);
-    } catch (e) {
-      return [];
-    }
+      var raw = localStorage.getItem(STORAGE_HABITS);
+      var list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch (e) { return []; }
   }
-  function saveEmployees(list) {
-    localStorage.setItem(STORAGE_KEYS.employees, JSON.stringify(list));
-  }
-  // Migratie: eerder opgeslagen bezetting kan nog een "bakplaat"-aantal bevatten van vóór de
-  // opsplitsing in hoofdplaat/assistentplaat. 1 persoon wordt hoofdplaat; elke extra wordt assistent.
-  function splitBakplaatCount(count) {
-    const c = count || 0;
-    return { hoofdplaat: c > 0 ? 1 : 0, assistentplaat: c > 1 ? c - 1 : 0 };
-  }
-  function migrateBakplaatInFlatReqs(flatReqs) {
-    if (!flatReqs || flatReqs.bakplaat === undefined) return flatReqs;
-    const { hoofdplaat, assistentplaat } = splitBakplaatCount(flatReqs.bakplaat);
-    const next = Object.assign({}, flatReqs);
-    delete next.bakplaat;
-    if (hoofdplaat) next.hoofdplaat = (next.hoofdplaat || 0) + hoofdplaat;
-    if (assistentplaat) next.assistentplaat = (next.assistentplaat || 0) + assistentplaat;
-    return next;
-  }
-  function migrateBakplaatInRequirements(reqs) {
-    const next = {};
-    Object.keys(reqs).forEach((dayKey) => {
-      const dayReqs = reqs[dayKey];
-      if (isPeriodDag(dayReqs)) {
-        next[dayKey] = Object.assign({}, dayReqs);
-        if (dayReqs.middag) next[dayKey].middag = migrateBakplaatInFlatReqs(dayReqs.middag);
-        if (dayReqs.avond) next[dayKey].avond = migrateBakplaatInFlatReqs(dayReqs.avond);
-      } else {
-        next[dayKey] = migrateBakplaatInFlatReqs(dayReqs);
-      }
-    });
-    return next;
-  }
-  function loadRequirements() {
+  function saveHabits(list) { localStorage.setItem(STORAGE_HABITS, JSON.stringify(list)); }
+
+  function loadChecks() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.requirements);
-      const parsed = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
-      return migrateBakplaatInRequirements(parsed);
-    } catch (e) {
-      return JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
+      var raw = localStorage.getItem(STORAGE_CHECKS);
+      var obj = raw ? JSON.parse(raw) : {};
+      return obj && typeof obj === "object" ? obj : {};
+    } catch (e) { return {}; }
+  }
+  function saveChecks(obj) { localStorage.setItem(STORAGE_CHECKS, JSON.stringify(obj)); }
+
+  var habits = loadHabits();
+  var checks = loadChecks(); // { habitId: { "YYYY-MM-DD": true } }
+  var yearOffsets = {}; // habitId -> offset from current year (for prev/next nav)
+
+  function isChecked(habitId, iso) {
+    return !!(checks[habitId] && checks[habitId][iso]);
+  }
+  function setChecked(habitId, iso, val) {
+    if (!checks[habitId]) checks[habitId] = {};
+    if (val) checks[habitId][iso] = true;
+    else delete checks[habitId][iso];
+    saveChecks(checks);
+  }
+  function toggleChecked(habitId, iso) {
+    var future = iso > todayISO();
+    if (future) return;
+    setChecked(habitId, iso, !isChecked(habitId, iso));
+    renderAll();
+  }
+
+  function colorVar(habit) {
+    var found = COLORS.filter(function (c) { return c.key === habit.color; })[0];
+    return "var(" + (found ? found.var : "--slot-1") + ")";
+  }
+
+  // ---------- streaks & stats ----------
+  function currentStreak(habitId) {
+    var count = 0;
+    var d = startOfDay(new Date());
+    if (!isChecked(habitId, toISO(d))) d = addDays(d, -1);
+    while (isChecked(habitId, toISO(d))) {
+      count++;
+      d = addDays(d, -1);
     }
+    return count;
   }
-  function saveRequirements(reqs) {
-    localStorage.setItem(STORAGE_KEYS.requirements, JSON.stringify(reqs));
-  }
-  function loadSchedule(weekValue) {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.schedulePrefix + weekValue);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
+
+  function yearStats(habitId, year) {
+    var map = checks[habitId] || {};
+    var count = 0;
+    for (var iso in map) {
+      if (map[iso] && iso.slice(0, 4) === String(year)) count++;
     }
-  }
-  function saveSchedule(weekValue, data) {
-    localStorage.setItem(STORAGE_KEYS.schedulePrefix + weekValue, JSON.stringify(data));
-  }
-  function loadOpenSluit() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.openSluit);
-      const parsed = raw ? JSON.parse(raw) : {};
-      const result = {};
-      DAYS.forEach((d) => {
-        const entry = parsed[d.key] || {};
-        const fallback = DEFAULT_OPEN_SLUIT[d.key];
-        result[d.key] = {
-          tijdsloten: Array.isArray(entry.tijdsloten) ? entry.tijdsloten : fallback.tijdsloten.slice(),
-          openers: Array.isArray(entry.openers) ? entry.openers : fallback.openers.slice(),
-          sluiters: typeof entry.sluiters === "number" ? entry.sluiters : fallback.sluiters,
-        };
-      });
-      return result;
-    } catch (e) {
-      return JSON.parse(JSON.stringify(DEFAULT_OPEN_SLUIT));
-    }
-  }
-  function saveOpenSluit(data) {
-    localStorage.setItem(STORAGE_KEYS.openSluit, JSON.stringify(data));
-  }
-  function loadSluitingstijd() {
-    return localStorage.getItem(STORAGE_KEYS.sluitingstijd) || DEFAULT_SLUITINGSTIJD;
-  }
-  function saveSluitingstijd(val) {
-    localStorage.setItem(STORAGE_KEYS.sluitingstijd, val);
-  }
-  function loadForbiddenPairs() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.forbiddenPairs);
-      const parsed = raw ? JSON.parse(raw) : {};
-      const migrated = {};
-      Object.entries(parsed).forEach(([taskKeyRaw, pairs]) => {
-        const taskKey = migrateTaskKey(taskKeyRaw);
-        migrated[taskKey] = (migrated[taskKey] || []).concat(pairs);
-      });
-      return migrated;
-    } catch (e) {
-      return {};
-    }
-  }
-  function saveForbiddenPairs(data) {
-    localStorage.setItem(STORAGE_KEYS.forbiddenPairs, JSON.stringify(data));
-  }
-  function listStoredWeeksBefore(weekValue) {
-    const weeks = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.indexOf(STORAGE_KEYS.schedulePrefix) === 0) {
-        const w = key.slice(STORAGE_KEYS.schedulePrefix.length);
-        if (w < weekValue) weeks.push(w);
-      }
-    }
-    return weeks.sort();
-  }
-
-  // ---------- App state ----------
-
-  let employees = loadEmployees();
-  let requirements = loadRequirements();
-  let openSluit = loadOpenSluit();
-  let sluitingstijd = loadSluitingstijd();
-  let forbiddenPairs = loadForbiddenPairs();
-  let editingEmployeeId = null;
-  let employeeFormVerlof = [];
-  let currentWeekValue = null;
-  let currentWeekDates = null;
-  let currentScheduleData = null; // { schedule, requirementsSnapshot }
-
-  function uid() {
-    return "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  }
-
-  // ---------- Tijdsloten helpers ----------
-
-  function parseTijdslot(label) {
-    const parts = label.split(" - ").map((s) => s.trim());
-    return { label, start: parts[0], eind: parts[1] };
-  }
-  // Parseert een vrij getypte tijd zoals "16:30 - 20:00", "16:30 tot sluit" of "1630-2000"
-  // die de gebruiker zelf intikt in het rooster, in plaats van te kiezen uit de vaste tijdsloten.
-  function parseFreeTijdslot(text) {
-    if (!text) return null;
-    const parts = text.trim().split(/\s*(?:-|tot)\s*/i);
-    if (parts.length !== 2) return null;
-    const normalizeTime = (s) => {
-      const t = s.trim().toLowerCase();
-      if (t === "sluit") return "sluit";
-      const m = t.replace(".", ":").match(/^(\d{1,2}):?(\d{2})$/);
-      if (!m) return null;
-      return `${m[1].padStart(2, "0")}:${m[2]}`;
-    };
-    const start = normalizeTime(parts[0]);
-    const eind = normalizeTime(parts[1]);
-    if (!start || !eind || start === "sluit") return null;
-    return { label: `${start} - ${eind === "sluit" ? "sluit" : eind}`, start, eind };
-  }
-  // Vult automatisch berekende tijdslot-toewijzingen aan/overschrijft ze met handmatig
-  // getypte tijden per medewerker per dag, en filtert de bijbehorende "geen tijdoptie"
-  // waarschuwing weg zodra iemand handmatig een geldige tijd heeft ingevuld.
-  function mergeTijdslotOverrides(dayKey, assignments, warnings, scheduleData) {
-    const dayOverrides = (scheduleData && scheduleData.tijdslotOverrides && scheduleData.tijdslotOverrides[dayKey]) || {};
-    const merged = { ...assignments };
-    let filteredWarnings = warnings;
-    Object.keys(dayOverrides).forEach((empId) => {
-      const parsed = parseFreeTijdslot(dayOverrides[empId]);
-      if (!parsed) return;
-      merged[empId] = parsed;
-      const emp = employees.find((e) => e.id === empId);
-      if (emp) {
-        const missingWarning = `${emp.naam} heeft geen passende tijdoptie ingesteld voor ${dayLabel(dayKey)}.`;
-        filteredWarnings = filteredWarnings.filter((w) => w !== missingWarning);
-      }
-    });
-    return { assignments: merged, warnings: filteredWarnings };
-  }
-  function tijdslotenForDay(dayKey) {
-    return ((openSluit[dayKey] && openSluit[dayKey].tijdsloten) || []).map(parseTijdslot);
-  }
-  function timeToMinutes(t) {
-    const [h, m] = (t || "0:0").split(":").map(Number);
-    return h * 60 + m;
-  }
-  function durationHours(start, eind) {
-    const eindResolved = eind === "sluit" ? sluitingstijd : eind;
-    const mins = timeToMinutes(eindResolved) - timeToMinutes(start);
-    return Math.max(0, mins) / 60;
-  }
-  function isOpenerStartForDay(dayKey, start) {
-    const openers = (openSluit[dayKey] && openSluit[dayKey].openers) || [];
-    return openers.some((o) => o.tijd === start);
-  }
-  // Tijdopties van een medewerker voor een dag, met de "openen-tot-sluit"-optie eruit
-  // gefilterd tenzij deze persoon daar expliciet toestemming voor heeft, en — als een
-  // specifieke datum wordt meegegeven — verder ingeperkt door gedeeltelijk verlof die dag.
-  function employeeTijdslotOptions(emp, dayKey, dateIso) {
-    const dagInfo = emp.dagen[dayKey];
-    const labels = dagInfo ? dagInfo.tijdsloten || [] : [];
-    let opts = labels.map(parseTijdslot).filter((opt) => {
-      if (opt.eind === "sluit" && isOpenerStartForDay(dayKey, opt.start) && !emp.magOpenTotSluit) return false;
-      return true;
-    });
-    if (dateIso) {
-      const verlofEntry = verlofEntryFor(emp, dateIso);
-      if (verlofEntry) {
-        if (verlofEntry.type === "hele_dag") {
-          opts = [];
-        } else if (verlofEntry.type === "vanaf") {
-          // Vrij vanaf een tijdstip: alleen opties die daarvoor al klaar zijn.
-          const cutoff = timeToMinutes(verlofEntry.tijd);
-          opts = opts.filter((opt) => timeToMinutes(opt.eind === "sluit" ? sluitingstijd : opt.eind) <= cutoff);
-        } else if (verlofEntry.type === "tot") {
-          // Vrij tot een tijdstip: alleen opties die daarna pas beginnen.
-          const cutoff = timeToMinutes(verlofEntry.tijd);
-          opts = opts.filter((opt) => timeToMinutes(opt.start) >= cutoff);
-        }
-      }
-    }
-    return opts;
-  }
-  function gemiddeldeUrenPerDienstGeschat() {
-    const alleDuren = [];
-    DAYS.forEach((day) => {
-      tijdslotenForDay(day.key).forEach((opt) => alleDuren.push(durationHours(opt.start, opt.eind)));
-    });
-    if (!alleDuren.length) return 6;
-    return alleDuren.reduce((a, b) => a + b, 0) / alleDuren.length;
-  }
-
-  // Wijst voor een dag tijdopties toe aan de reeds op taken ingedeelde medewerkers: eerst
-  // de openers op de ingestelde openingstijden, dan precies het ingestelde aantal sluiters,
-  // en de rest krijgt een resterende optie (bij voorkeur niet tot sluit).
-  function assignTijdslotenForDay(dayKey, dateIso, employeeIds) {
-    const daySettings = openSluit[dayKey] || { openers: [], sluiters: 0 };
-    const assignments = {};
-    const warnings = [];
-    const remaining = new Set(employeeIds);
-    const empById = (id) => employees.find((e) => e.id === id);
-
-    (daySettings.openers || []).forEach(({ tijd, aantal }) => {
-      const candidates = Array.from(remaining)
-        .map(empById)
-        .filter((e) => e && employeeTijdslotOptions(e, dayKey, dateIso).some((o) => o.start === tijd))
-        .sort((a, b) => a.naam.localeCompare(b.naam));
-      const gekozen = candidates.slice(0, aantal);
-      gekozen.forEach((e) => {
-        const opts = employeeTijdslotOptions(e, dayKey, dateIso).filter((o) => o.start === tijd);
-        assignments[e.id] = opts.find((o) => o.eind !== "sluit") || opts[0];
-        remaining.delete(e.id);
-      });
-      if (gekozen.length < aantal) {
-        warnings.push(`${dayLabel(dayKey)}: ${aantal - gekozen.length} tekort aan openers om ${tijd}`);
-      }
-    });
-
-    const sluitCountAlready = Object.values(assignments).filter((a) => a.eind === "sluit").length;
-    const sluitersNodig = (daySettings.sluiters || 0) - sluitCountAlready;
-    if (sluitersNodig > 0) {
-      // Sleutelhouders krijgen voorrang in de sluitploeg, zodat er zoveel mogelijk automatisch
-      // minstens 1 sleutelhouder aanwezig is bij het afsluiten.
-      const candidates = Array.from(remaining)
-        .map(empById)
-        .filter((e) => e && employeeTijdslotOptions(e, dayKey, dateIso).some((o) => o.eind === "sluit"))
-        .sort((a, b) => (b.heeftSleutel ? 1 : 0) - (a.heeftSleutel ? 1 : 0) || a.naam.localeCompare(b.naam));
-      const gekozen = candidates.slice(0, sluitersNodig);
-      gekozen.forEach((e) => {
-        assignments[e.id] = employeeTijdslotOptions(e, dayKey, dateIso).find((o) => o.eind === "sluit");
-        remaining.delete(e.id);
-      });
-      if (gekozen.length < sluitersNodig) {
-        warnings.push(`${dayLabel(dayKey)}: ${sluitersNodig - gekozen.length} tekort aan sluiters`);
-      }
-    } else if (sluitersNodig < 0) {
-      warnings.push(
-        `${dayLabel(dayKey)}: er staan meer mensen tot sluit ingepland dan de ${daySettings.sluiters} die nodig zijn`
-      );
-    }
-
-    remaining.forEach((id) => {
-      const e = empById(id);
-      if (!e) return;
-      const opts = employeeTijdslotOptions(e, dayKey, dateIso);
-      const chosen = opts.find((o) => o.eind !== "sluit") || opts[0] || null;
-      if (chosen) assignments[id] = chosen;
-      else warnings.push(`${e.naam} heeft geen passende tijdoptie ingesteld voor ${dayLabel(dayKey)}.`);
-    });
-
-    // Er moet minstens 1 sleutelhouder in de sluitploeg staan om daadwerkelijk af te kunnen sluiten.
-    if ((daySettings.sluiters || 0) > 0) {
-      const sluiters = Object.keys(assignments).filter((id) => assignments[id].eind === "sluit");
-      const heeftSleutelhouder = sluiters.some((id) => {
-        const e = empById(id);
-        return e && e.heeftSleutel;
-      });
-      if (sluiters.length > 0 && !heeftSleutelhouder) {
-        warnings.push(`${dayLabel(dayKey)}: niemand met een sleutel staat ingepland om te sluiten.`);
-      }
-    }
-
-    return { assignments, warnings };
-  }
-
-  // ---------- Tabs ----------
-
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-      if (btn.dataset.tab === "vrijvraging") {
-        renderVerlofOverview();
-        renderAanvraagOverview();
-      }
-    });
-  });
-
-  // ---------- Employee form: build checkboxes ----------
-
-  // Per taak: een checkbox ("kan dit") plus een uitklapbare rij dagen ("niet op:") voor
-  // wie een taak wel kan, maar op sommige (drukkere) dagen nog niet aan zou moeten.
-  function buildTakenRows(container) {
-    container.innerHTML = "";
-    TASKS.forEach((task) => {
-      const row = document.createElement("div");
-      row.className = "taak-row";
-      row.dataset.task = task.key;
-
-      const label = document.createElement("label");
-      label.className = "dag-checkbox-label";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.name = "taken";
-      checkbox.value = task.key;
-      label.appendChild(checkbox);
-      label.appendChild(document.createTextNode(task.label));
-
-      const uitzonderingenBox = document.createElement("div");
-      uitzonderingenBox.className = "taak-uitzonderingen-box";
-      const hint = document.createElement("span");
-      hint.className = "taak-uitzonderingen-hint";
-      hint.textContent = "Niet op:";
-      uitzonderingenBox.appendChild(hint);
-      DAYS.forEach((day) => {
-        const dagLabel = document.createElement("label");
-        dagLabel.className = "tijdslot-option";
-        const dagCheckbox = document.createElement("input");
-        dagCheckbox.type = "checkbox";
-        dagCheckbox.value = day.key;
-        dagCheckbox.disabled = true;
-        dagLabel.appendChild(dagCheckbox);
-        dagLabel.appendChild(document.createTextNode(" " + day.label));
-        uitzonderingenBox.appendChild(dagLabel);
-      });
-
-      const secundairLabel = document.createElement("label");
-      secundairLabel.className = "taak-secundair-label";
-      const secundairCheckbox = document.createElement("input");
-      secundairCheckbox.type = "checkbox";
-      secundairCheckbox.className = "taak-secundair-checkbox";
-      secundairCheckbox.disabled = true;
-      secundairLabel.appendChild(secundairCheckbox);
-      secundairLabel.appendChild(
-        document.createTextNode(" Secundair (kan dit, maar doet het niet vaak / niet het liefst)")
-      );
-
-      checkbox.addEventListener("change", () => {
-        uitzonderingenBox.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-          cb.disabled = !checkbox.checked;
-          if (!checkbox.checked) cb.checked = false;
-        });
-        secundairCheckbox.disabled = !checkbox.checked;
-        if (!checkbox.checked) secundairCheckbox.checked = false;
-      });
-
-      row.appendChild(label);
-      row.appendChild(uitzonderingenBox);
-      row.appendChild(secundairLabel);
-      container.appendChild(row);
-    });
-  }
-
-  function getTakenData() {
-    const taken = [];
-    const takenUitzonderingen = {};
-    const secundaireTaken = [];
-    document.querySelectorAll("#employee-taken .taak-row").forEach((row) => {
-      const taskKey = row.dataset.task;
-      const checkbox = row.querySelector('input[name="taken"]');
-      if (!checkbox.checked) return;
-      taken.push(taskKey);
-      const uitgeslotenDagen = Array.from(
-        row.querySelectorAll('.taak-uitzonderingen-box input[type="checkbox"]:checked')
-      ).map((cb) => cb.value);
-      if (uitgeslotenDagen.length) takenUitzonderingen[taskKey] = uitgeslotenDagen;
-      const secundairCheckbox = row.querySelector(".taak-secundair-checkbox");
-      if (secundairCheckbox && secundairCheckbox.checked) secundaireTaken.push(taskKey);
-    });
-    return { taken, takenUitzonderingen, secundaireTaken };
-  }
-
-  function setTakenData(taken, takenUitzonderingen, secundaireTaken) {
-    const takenArr = taken || [];
-    const secundaireArr = secundaireTaken || [];
-    document.querySelectorAll("#employee-taken .taak-row").forEach((row) => {
-      const taskKey = row.dataset.task;
-      const checkbox = row.querySelector('input[name="taken"]');
-      const checked = takenArr.includes(taskKey);
-      checkbox.checked = checked;
-      const excludedDays = new Set(checked && takenUitzonderingen ? takenUitzonderingen[taskKey] || [] : []);
-      row.querySelectorAll('.taak-uitzonderingen-box input[type="checkbox"]').forEach((cb) => {
-        cb.disabled = !checked;
-        cb.checked = checked && excludedDays.has(cb.value);
-      });
-      const secundairCheckbox = row.querySelector(".taak-secundair-checkbox");
-      if (secundairCheckbox) {
-        secundairCheckbox.disabled = !checked;
-        secundairCheckbox.checked = checked && secundaireArr.includes(taskKey);
-      }
-    });
-  }
-
-  function isTaakUitgeslotenOpDag(emp, task, dayKey) {
-    return !!(emp.takenUitzonderingen && emp.takenUitzonderingen[task] && emp.takenUitzonderingen[task].includes(dayKey));
-  }
-
-  // Een secundaire taak kan iemand wel, maar doet diegene niet vaak of niet het liefst —
-  // bij het invullen van het rooster krijgen mensen met deze taak als hoofd-/voorkeurtaak
-  // voorrang boven wie deze taak alleen als secundair heeft.
-  function isSecundaireTaak(emp, task) {
-    return !!(emp.secundaireTaken && emp.secundaireTaken.includes(task));
-  }
-
-  // Iemand die "hoofdplaat" kan, is per definitie ook geschikt voor de eenvoudigere
-  // "assistentplaat"-rol. Zo'n medewerker mag dus ook op een assistent-plek worden
-  // ingepland, waardoor er ook 2 hoofdplaat-mensen samen aan de plaat kunnen staan
-  // in plaats van altijd verplicht 1 hoofd + 1 assistent.
-  function employeeCanDoTask(emp, task) {
-    if (emp.taken.includes(task)) return true;
-    if (task === "assistentplaat" && emp.taken.includes("hoofdplaat")) return true;
-    return false;
-  }
-
-  function buildDagenRows(container, items, groupName) {
-    container.innerHTML = "";
-    items.forEach((item) => {
-      const row = document.createElement("div");
-      row.className = "dag-row";
-      row.dataset.day = item.key;
-
-      const label = document.createElement("label");
-      label.className = "dag-checkbox-label";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.name = groupName;
-      checkbox.value = item.key;
-      label.appendChild(checkbox);
-      label.appendChild(document.createTextNode(item.label));
-
-      const tijdslotenBox = document.createElement("div");
-      tijdslotenBox.className = "tijdsloten-box";
-      tijdslotenBox.dataset.day = item.key;
-      renderTijdslotCheckboxes(tijdslotenBox, item.key);
-
-      checkbox.addEventListener("change", () => {
-        setTijdslotenBoxEnabled(tijdslotenBox, checkbox.checked);
-        if (checkbox.checked) uncheckOtherGroup(groupName, item.key);
-      });
-
-      row.appendChild(label);
-      row.appendChild(tijdslotenBox);
-      container.appendChild(row);
-    });
-  }
-
-  function renderTijdslotCheckboxes(box, dayKey) {
-    box.innerHTML = "";
-    const opts = tijdslotenForDay(dayKey);
-    if (!opts.length) {
-      box.innerHTML = '<span class="fieldset-hint">Geen tijdopties ingesteld voor deze dag (zie Bezetting-tab).</span>';
-      return;
-    }
-    opts.forEach((opt) => {
-      const lbl = document.createElement("label");
-      lbl.className = "tijdslot-option";
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.value = opt.label;
-      cb.dataset.start = opt.start;
-      cb.dataset.eind = opt.eind;
-      cb.disabled = true;
-      lbl.appendChild(cb);
-      lbl.appendChild(document.createTextNode(" " + opt.label));
-      box.appendChild(lbl);
-    });
-  }
-
-  function setTijdslotenBoxEnabled(box, enabled) {
-    box.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-      cb.disabled = !enabled;
-    });
-    if (enabled) applyOpenTotSluitRestriction(box);
-  }
-
-  function applyOpenTotSluitRestriction(box) {
-    const dayKey = box.dataset.day;
-    const allowed = magOpenTotSluitCheckbox.checked;
-    box.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-      if (cb.disabled) return;
-      const isOpenTotSluit = cb.dataset.eind === "sluit" && isOpenerStartForDay(dayKey, cb.dataset.start);
-      if (isOpenTotSluit && !allowed) {
-        cb.disabled = true;
-        cb.checked = false;
-        cb.title = "Alleen toegestaan voor medewerkers die van openen tot sluiten mogen werken.";
-      }
-    });
-  }
-
-  function refreshAllOpenTotSluitRestrictions() {
-    document.querySelectorAll(".tijdsloten-box").forEach((box) => {
-      const row = box.closest(".dag-row");
-      const cb = row && row.querySelector('input[type="checkbox"][name="vast"], input[type="checkbox"][name="beschikbaar"]');
-      if (cb && cb.checked) applyOpenTotSluitRestriction(box);
-    });
-  }
-
-  function uncheckOtherGroup(sourceGroupName, day) {
-    const otherGroupName = sourceGroupName === "vast" ? "beschikbaar" : "vast";
-    const otherContainer = otherGroupName === "vast" ? vasteDagenContainer : beschikbaarDagenContainer;
-    const otherRow = otherContainer.querySelector(`.dag-row[data-day="${day}"]`);
-    if (!otherRow) return;
-    const otherCheckbox = otherRow.querySelector(`input[name="${otherGroupName}"]`);
-    const otherBox = otherRow.querySelector(".tijdsloten-box");
-    otherCheckbox.checked = false;
-    setTijdslotenBoxEnabled(otherBox, false);
-  }
-
-  buildTakenRows(document.getElementById("employee-taken"));
-  const vasteDagenContainer = document.getElementById("employee-vaste-dagen");
-  const beschikbaarDagenContainer = document.getElementById("employee-beschikbaar-dagen");
-  const magOpenTotSluitCheckbox = document.getElementById("employee-mag-open-tot-sluit");
-  buildDagenRows(vasteDagenContainer, DAYS, "vast");
-  buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
-  magOpenTotSluitCheckbox.addEventListener("change", refreshAllOpenTotSluitRestrictions);
-
-  const nooitAlleenBijSelect = document.getElementById("employee-nooit-alleen-bij");
-  nooitAlleenBijSelect.innerHTML =
-    '<option value="">Geen</option>' + TASKS.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
-  function getNooitAlleenBij() {
-    return nooitAlleenBijSelect.value || null;
-  }
-  function setNooitAlleenBij(taskKey) {
-    nooitAlleenBijSelect.value = taskKey || "";
-  }
-
-  function getMagOpenTotSluit() {
-    return magOpenTotSluitCheckbox.checked;
-  }
-  function setMagOpenTotSluit(val) {
-    magOpenTotSluitCheckbox.checked = !!val;
-  }
-
-  const heeftSleutelCheckbox = document.getElementById("employee-heeft-sleutel");
-  function getHeeftSleutel() {
-    return heeftSleutelCheckbox.checked;
-  }
-  function setHeeftSleutel(val) {
-    heeftSleutelCheckbox.checked = !!val;
-  }
-
-  function getDagenData() {
-    const dagen = {};
-    [
-      ["vast", vasteDagenContainer],
-      ["beschikbaar", beschikbaarDagenContainer],
-    ].forEach(([type, container]) => {
-      container.querySelectorAll(".dag-row").forEach((row) => {
-        const day = row.dataset.day;
-        const checkbox = row.querySelector(`input[name="${type}"]`);
-        if (!checkbox.checked) return;
-        const tijdsloten = Array.from(row.querySelectorAll('.tijdsloten-box input[type="checkbox"]:checked')).map(
-          (cb) => cb.value
-        );
-        dagen[day] = { type, tijdsloten };
-      });
-    });
-    return dagen;
-  }
-
-  function setDagenData(dagen) {
-    [
-      ["vast", vasteDagenContainer],
-      ["beschikbaar", beschikbaarDagenContainer],
-    ].forEach(([type, container]) => {
-      container.querySelectorAll(".dag-row").forEach((row) => {
-        const day = row.dataset.day;
-        const checkbox = row.querySelector(`input[name="${type}"]`);
-        const box = row.querySelector(".tijdsloten-box");
-        const entry = dagen[day];
-        const checked = !!entry && entry.type === type;
-        checkbox.checked = checked;
-        setTijdslotenBoxEnabled(box, checked);
-        const selected = new Set(checked ? entry.tijdsloten : []);
-        box.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-          cb.checked = !cb.disabled && selected.has(cb.value);
-        });
-      });
-    });
-  }
-
-  // ---------- Vast contract in het formulier ----------
-
-  const contractVastCheckbox = document.getElementById("employee-contract-vast");
-  const contractUrenInput = document.getElementById("employee-contract-uren");
-  const contractPeriodeSelect = document.getElementById("employee-contract-periode");
-
-  contractVastCheckbox.addEventListener("change", () => {
-    contractUrenInput.disabled = !contractVastCheckbox.checked;
-    contractPeriodeSelect.disabled = !contractVastCheckbox.checked;
-  });
-
-  function getContractData() {
-    return {
-      vast: contractVastCheckbox.checked,
-      uren: parseFloat(contractUrenInput.value) || 0,
-      periode: contractPeriodeSelect.value,
-    };
-  }
-
-  function setContractData(contract) {
-    const c = contract || { vast: false, uren: 0, periode: "week" };
-    contractVastCheckbox.checked = c.vast;
-    contractUrenInput.value = c.uren || "";
-    contractPeriodeSelect.value = c.periode || "week";
-    contractUrenInput.disabled = !c.vast;
-    contractPeriodeSelect.disabled = !c.vast;
-  }
-
-  // ---------- Verlof list in the form ----------
-
-  function verlofEntryLabel(entry) {
-    if (entry.type === "vanaf") return `vanaf ${entry.tijd} vrij`;
-    if (entry.type === "tot") return `tot ${entry.tijd} vrij`;
-    return "hele dag";
-  }
-
-  function renderVerlofList() {
-    const ul = document.getElementById("employee-verlof-list");
-    ul.innerHTML = "";
-    employeeFormVerlof
-      .slice()
-      .sort((a, b) => a.datum.localeCompare(b.datum))
-      .forEach((entry) => {
-        const li = document.createElement("li");
-        li.textContent = `${entry.datum} (${verlofEntryLabel(entry)}) `;
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.textContent = "✕";
-        removeBtn.addEventListener("click", () => {
-          employeeFormVerlof = employeeFormVerlof.filter((v) => v.datum !== entry.datum);
-          renderVerlofList();
-        });
-        li.appendChild(removeBtn);
-        ul.appendChild(li);
-      });
-  }
-
-  const verlofTypeSelect = document.getElementById("employee-verlof-type");
-  const verlofTijdInput = document.getElementById("employee-verlof-tijd");
-  verlofTypeSelect.addEventListener("change", () => {
-    verlofTijdInput.hidden = verlofTypeSelect.value === "hele_dag";
-  });
-
-  // Alle datums van "van" t/m "tot" (beide inclusief); zonder "tot" is dat gewoon de ene datum.
-  function datesInRange(vanDatum, totDatum) {
-    const datums = [];
-    let cursor = new Date(vanDatum + "T00:00:00Z");
-    const eind = new Date((totDatum || vanDatum) + "T00:00:00Z");
-    while (cursor <= eind) {
-      datums.push(cursor.toISOString().slice(0, 10));
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
-    }
-    return datums;
-  }
-
-  document.getElementById("add-verlof-btn").addEventListener("click", () => {
-    const datumInput = document.getElementById("employee-verlof-datum");
-    const datumTotInput = document.getElementById("employee-verlof-datum-tot");
-    if (!datumInput.value) return;
-    if (datumTotInput.value && datumTotInput.value < datumInput.value) {
-      alert('"T/m" moet op of na de "van"-datum liggen.');
-      return;
-    }
-    const type = verlofTypeSelect.value;
-    if (type !== "hele_dag" && !verlofTijdInput.value) {
-      alert("Vul een tijdstip in voor dit gedeeltelijke verlof.");
-      return;
-    }
-    const datums = datesInRange(datumInput.value, datumTotInput.value);
-    if (datums.length > 60) {
-      alert("Die periode is langer dan 60 dagen — controleer de data.");
-      return;
-    }
-    datums.forEach((datum) => {
-      employeeFormVerlof = employeeFormVerlof.filter((v) => v.datum !== datum);
-      employeeFormVerlof.push({ datum, type, tijd: type === "hele_dag" ? null : verlofTijdInput.value });
-    });
-    renderVerlofList();
-    datumInput.value = "";
-    datumTotInput.value = "";
-    verlofTypeSelect.value = "hele_dag";
-    verlofTijdInput.value = "";
-    verlofTijdInput.hidden = true;
-  });
-
-  // ---------- Dienst aanvragen in het formulier ----------
-
-  let employeeFormAanvragen = [];
-  const aanvraagTaakSelect = document.getElementById("employee-aanvraag-taak");
-  aanvraagTaakSelect.innerHTML = TASKS.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
-
-  function renderAanvraagList() {
-    const ul = document.getElementById("employee-aanvraag-list");
-    ul.innerHTML = "";
-    employeeFormAanvragen
-      .slice()
-      .sort((a, b) => a.datum.localeCompare(b.datum))
-      .forEach((aanvraag) => {
-        const li = document.createElement("li");
-        li.textContent = `${aanvraag.datum} — ${taskLabel(aanvraag.taak)} `;
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.textContent = "✕";
-        removeBtn.addEventListener("click", () => {
-          employeeFormAanvragen = employeeFormAanvragen.filter(
-            (a) => !(a.datum === aanvraag.datum && a.taak === aanvraag.taak)
-          );
-          renderAanvraagList();
-        });
-        li.appendChild(removeBtn);
-        ul.appendChild(li);
-      });
-  }
-
-  document.getElementById("add-aanvraag-btn").addEventListener("click", () => {
-    const datumInput = document.getElementById("employee-aanvraag-datum");
-    if (!datumInput.value) return;
-    const taak = aanvraagTaakSelect.value;
-    const bestaatAl = employeeFormAanvragen.some((a) => a.datum === datumInput.value && a.taak === taak);
-    if (!bestaatAl) employeeFormAanvragen.push({ datum: datumInput.value, taak });
-    renderAanvraagList();
-    datumInput.value = "";
-  });
-
-  // ---------- Employee form submit / reset ----------
-
-  function resetEmployeeForm() {
-    editingEmployeeId = null;
-    employeeFormVerlof = [];
-    employeeFormAanvragen = [];
-    document.getElementById("employee-form").reset();
-    setTakenData([], {});
-    setMagOpenTotSluit(false);
-    setHeeftSleutel(false);
-    setNooitAlleenBij(null);
-    setDagenData({});
-    setContractData(null);
-    renderVerlofList();
-    renderAanvraagList();
-    document.getElementById("employee-form-title").textContent = "Nieuwe medewerker";
-    document.getElementById("employee-cancel-btn").hidden = true;
-  }
-
-  document.getElementById("employee-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const naam = document.getElementById("employee-naam").value.trim();
-    if (!naam) return;
-    const { taken, takenUitzonderingen, secundaireTaken } = getTakenData();
-    const magOpenTotSluit = getMagOpenTotSluit();
-    const heeftSleutel = getHeeftSleutel();
-    const nooitAlleenBij = getNooitAlleenBij();
-    const dagen = getDagenData();
-    const contract = getContractData();
-
-    if (editingEmployeeId) {
-      const emp = employees.find((e) => e.id === editingEmployeeId);
-      emp.naam = naam;
-      emp.taken = taken;
-      emp.takenUitzonderingen = takenUitzonderingen;
-      emp.secundaireTaken = secundaireTaken;
-      emp.magOpenTotSluit = magOpenTotSluit;
-      emp.heeftSleutel = heeftSleutel;
-      emp.nooitAlleenBij = nooitAlleenBij;
-      emp.dagen = dagen;
-      emp.contract = contract;
-      emp.verlof = employeeFormVerlof.slice();
-      emp.dienstAanvragen = employeeFormAanvragen.slice();
+    var now = new Date();
+    var isCurrentYear = now.getFullYear() === year;
+    var totalDays;
+    if (isCurrentYear) {
+      var start = new Date(year, 0, 1);
+      totalDays = Math.floor((startOfDay(now) - start) / 86400000) + 1;
+    } else if (year < now.getFullYear()) {
+      totalDays = (new Date(year, 11, 31) - new Date(year, 0, 1)) / 86400000 + 1;
     } else {
-      employees.push({
-        id: uid(),
-        naam,
-        taken,
-        takenUitzonderingen,
-        secundaireTaken,
-        magOpenTotSluit,
-        heeftSleutel,
-        nooitAlleenBij,
-        dagen,
-        contract,
-        verlof: employeeFormVerlof.slice(),
-        dienstAanvragen: employeeFormAanvragen.slice(),
-      });
+      totalDays = 0;
     }
-    saveEmployees(employees);
-    renderEmployeeTable();
-    resetEmployeeForm();
-  });
-
-  document.getElementById("employee-cancel-btn").addEventListener("click", resetEmployeeForm);
-
-  function startEditEmployee(id) {
-    const emp = employees.find((e) => e.id === id);
-    if (!emp) return;
-    editingEmployeeId = id;
-    employeeFormVerlof = emp.verlof.slice();
-    employeeFormAanvragen = emp.dienstAanvragen.slice();
-    document.getElementById("employee-naam").value = emp.naam;
-    setTakenData(emp.taken, emp.takenUitzonderingen, emp.secundaireTaken);
-    setMagOpenTotSluit(emp.magOpenTotSluit);
-    setHeeftSleutel(emp.heeftSleutel);
-    setNooitAlleenBij(emp.nooitAlleenBij);
-    setDagenData(emp.dagen);
-    setContractData(emp.contract);
-    renderVerlofList();
-    renderAanvraagList();
-    document.getElementById("employee-form-title").textContent = "Medewerker bewerken: " + emp.naam;
-    document.getElementById("employee-cancel-btn").hidden = false;
-    document.getElementById("employee-form").scrollIntoView({ behavior: "smooth", block: "start" });
+    var pct = totalDays > 0 ? Math.round((count / totalDays) * 100) : 0;
+    return { count: count, totalDays: totalDays, pct: pct };
   }
 
-  function deleteEmployee(id) {
-    const emp = employees.find((e) => e.id === id);
-    if (!emp) return;
-    if (!confirm(`Weet je zeker dat je "${emp.naam}" wilt verwijderen?`)) return;
-    employees = employees.filter((e) => e.id !== id);
-    saveEmployees(employees);
-    renderEmployeeTable();
-    if (editingEmployeeId === id) resetEmployeeForm();
+  function longestStreak(habitId) {
+    var map = checks[habitId] || {};
+    var dates = Object.keys(map).filter(function (k) { return map[k]; }).sort();
+    if (!dates.length) return 0;
+    var best = 1, run = 1;
+    for (var i = 1; i < dates.length; i++) {
+      var prev = new Date(dates[i - 1]);
+      var cur = new Date(dates[i]);
+      var diff = Math.round((cur - prev) / 86400000);
+      if (diff === 1) { run++; } else { run = 1; }
+      if (run > best) best = run;
+    }
+    return best;
   }
 
-  // ---------- Employee table ----------
+  // ---------- rendering ----------
+  function renderHeroDate() {
+    var now = new Date();
+    document.getElementById("todayWeekday").textContent = WEEKDAYS_LONG[now.getDay()];
+    document.getElementById("todayFull").textContent =
+      now.getDate() + " " + MONTHS_LONG[now.getMonth()] + " " + now.getFullYear();
+  }
 
-  function renderEmployeeTable() {
-    const tbody = document.getElementById("employee-tbody");
-    tbody.innerHTML = "";
-    document.getElementById("employee-empty-msg").hidden = employees.length > 0;
+  function renderHeroProgress() {
+    var iso = todayISO();
+    var total = habits.length;
+    var done = habits.filter(function (h) { return isChecked(h.id, iso); }).length;
+    document.getElementById("heroProgressText").textContent = done + " / " + total;
+    var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    document.getElementById("heroProgressFill").style.width = pct + "%";
+  }
 
-    employees
-      .slice()
-      .sort((a, b) => a.naam.localeCompare(b.naam))
-      .forEach((emp) => {
-        const tr = document.createElement("tr");
+  function renderColorPicker() {
+    var wrap = document.getElementById("colorPicker");
+    wrap.innerHTML = "";
+    COLORS.forEach(function (c, idx) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "swatch";
+      btn.style.background = "var(" + c.var + ")";
+      btn.dataset.color = c.key;
+      btn.setAttribute("aria-pressed", idx === 0 ? "true" : "false");
+      btn.title = "Kies deze kleur";
+      btn.addEventListener("click", function () {
+        wrap.querySelectorAll(".swatch").forEach(function (s) { s.setAttribute("aria-pressed", "false"); });
+        btn.setAttribute("aria-pressed", "true");
+      });
+      wrap.appendChild(btn);
+    });
+  }
+  function selectedColorKey() {
+    var el = document.querySelector("#colorPicker .swatch[aria-pressed='true']");
+    return el ? el.dataset.color : COLORS[0].key;
+  }
 
-        const tdNaam = document.createElement("td");
-        tdNaam.textContent = emp.naam + (emp.magOpenTotSluit ? " 🔓" : "") + (emp.heeftSleutel ? " 🔑" : "");
-        const naamTitels = [];
-        if (emp.magOpenTotSluit) naamTitels.push("Mag van openen tot sluiten werken");
-        if (emp.heeftSleutel) naamTitels.push("Heeft een sleutel");
-        if (naamTitels.length) tdNaam.title = naamTitels.join(" · ");
-        tr.appendChild(tdNaam);
+  function renderTodayList() {
+    var list = document.getElementById("todayList");
+    var empty = document.getElementById("emptyState");
+    list.innerHTML = "";
+    if (!habits.length) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+    var iso = todayISO();
+    habits.forEach(function (h) {
+      var li = document.createElement("li");
+      li.className = "habit-row";
 
-        const tdTaken = document.createElement("td");
-        tdTaken.innerHTML =
-          emp.taken
-            .map((t) => {
-              const uitgesloten = (emp.takenUitzonderingen && emp.takenUitzonderingen[t]) || [];
-              const secundairSuffix = isSecundaireTaak(emp, t) ? " (secundair)" : "";
-              const suffix = (uitgesloten.length ? ` (niet op: ${uitgesloten.map(dayLabel).join(", ")})` : "") + secundairSuffix;
-              const tagClass = isSecundaireTaak(emp, t) ? "tag tag-secundair" : "tag";
-              return `<span class="${tagClass}">${taskLabel(t)}${suffix}</span>`;
-            })
-            .join("") +
-            (emp.nooitAlleenBij ? `<span class="tag tag-beschikbaar">nooit alleen: ${taskLabel(emp.nooitAlleenBij)}</span>` : "") ||
-          "—";
-        tr.appendChild(tdTaken);
+      var checkBtn = document.createElement("button");
+      checkBtn.type = "button";
+      checkBtn.className = "check-btn";
+      checkBtn.style.setProperty("--check-color", colorVar(h));
+      var checked = isChecked(h.id, iso);
+      checkBtn.setAttribute("aria-pressed", checked ? "true" : "false");
+      checkBtn.setAttribute("aria-label", (checked ? "Zet af als niet gedaan: " : "Vink af als gedaan: ") + h.name);
+      checkBtn.textContent = checked ? "✓" : "";
+      checkBtn.addEventListener("click", function () { toggleChecked(h.id, iso); });
 
-        const tdDagen = document.createElement("td");
-        tdDagen.innerHTML =
-          vasteDagenOf(emp)
-            .map(
-              (d) =>
-                `<span class="tag">${dayLabel(d)}: ${(emp.dagen[d].tijdsloten || []).join(", ") || "geen tijden gekozen"}</span>`
-            )
-            .join("") || "—";
-        tr.appendChild(tdDagen);
+      var dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.setProperty("--dot-color", colorVar(h));
 
-        const tdBeschikbaar = document.createElement("td");
-        tdBeschikbaar.innerHTML =
-          beschikbareDagenOf(emp)
-            .map(
-              (d) =>
-                `<span class="tag tag-beschikbaar">${dayLabel(d)}: ${
-                  (emp.dagen[d].tijdsloten || []).join(", ") || "geen tijden gekozen"
-                }</span>`
-            )
-            .join("") || "—";
-        tr.appendChild(tdBeschikbaar);
+      var name = document.createElement("span");
+      name.className = "habit-name";
+      name.textContent = h.name;
 
-        const tdContract = document.createElement("td");
-        tdContract.innerHTML = emp.contract && emp.contract.vast
-          ? `<span class="tag">Vast · ${emp.contract.uren}u per ${emp.contract.periode === "maand" ? "maand" : "week"}</span>`
-          : "—";
-        tr.appendChild(tdContract);
+      var streak = document.createElement("span");
+      streak.className = "streak-badge";
+      var s = currentStreak(h.id);
+      streak.textContent = s > 0 ? "🔥 " + s : "";
 
-        const tdVerlof = document.createElement("td");
-        tdVerlof.innerHTML =
-          emp.verlof
-            .slice()
-            .sort((a, b) => a.datum.localeCompare(b.datum))
-            .map((v) => `<span class="tag">${v.datum} (${verlofEntryLabel(v)})</span>`)
-            .join("") || "—";
-        tr.appendChild(tdVerlof);
-
-        const tdAanvragen = document.createElement("td");
-        tdAanvragen.innerHTML =
-          emp.dienstAanvragen
-            .slice()
-            .sort((a, b) => a.datum.localeCompare(b.datum))
-            .map((a) => `<span class="tag tag-beschikbaar">${a.datum} — ${taskLabel(a.taak)}</span>`)
-            .join("") || "—";
-        tr.appendChild(tdAanvragen);
-
-        const tdActions = document.createElement("td");
-        tdActions.className = "row-actions";
-        const editBtn = document.createElement("button");
-        editBtn.textContent = "Bewerken";
-        editBtn.addEventListener("click", () => startEditEmployee(emp.id));
-        const delBtn = document.createElement("button");
-        delBtn.textContent = "Verwijderen";
-        delBtn.className = "delete";
-        delBtn.addEventListener("click", () => deleteEmployee(emp.id));
-        tdActions.appendChild(editBtn);
-        tdActions.appendChild(delBtn);
-        tr.appendChild(tdActions);
-
-        tbody.appendChild(tr);
+      var delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "delete-btn";
+      delBtn.textContent = "✕";
+      delBtn.title = "Verwijder gewoonte";
+      delBtn.addEventListener("click", function () {
+        if (delBtn.classList.contains("confirming")) {
+          deleteHabit(h.id);
+        } else {
+          delBtn.classList.add("confirming");
+          delBtn.textContent = "Zeker?";
+          setTimeout(function () {
+            delBtn.classList.remove("confirming");
+            delBtn.textContent = "✕";
+          }, 3000);
+        }
       });
 
-    renderForbiddenEmployeeSelects();
-    renderVerlofOverview();
-    renderAanvraagOverview();
-  }
-
-  // ---------- Export / import ----------
-
-  document.getElementById("export-btn").addEventListener("click", () => {
-    const data = { employees, requirements, openSluit, sluitingstijd, forbiddenPairs };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "friettent-rooster-data.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-
-  document.getElementById("import-input").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(reader.result);
-        if (Array.isArray(data.employees)) {
-          employees = data.employees.map(normalizeEmployee);
-          saveEmployees(employees);
-        }
-        if (data.requirements) {
-          requirements = data.requirements;
-          saveRequirements(requirements);
-        }
-        if (data.openSluit) {
-          openSluit = data.openSluit;
-          saveOpenSluit(openSluit);
-        }
-        if (data.sluitingstijd) {
-          sluitingstijd = data.sluitingstijd;
-          saveSluitingstijd(sluitingstijd);
-        }
-        if (data.forbiddenPairs) {
-          forbiddenPairs = data.forbiddenPairs;
-          saveForbiddenPairs(forbiddenPairs);
-        }
-        buildDagenRows(vasteDagenContainer, DAYS, "vast");
-        buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
-        renderEmployeeTable();
-        renderRequirementsTable();
-        renderOpenSluitTable();
-        resetEmployeeForm();
-        alert("Import gelukt.");
-      } catch (err) {
-        alert("Kon bestand niet lezen: " + err.message);
-      }
-      e.target.value = "";
-    };
-    reader.readAsText(file);
-  });
-
-  // ---------- Bezetting (requirements) tab ----------
-
-  // Dagen met een omslagtijd worden als 2 kolommen getoond (middagspits/avondspits);
-  // gewone dagen blijven 1 kolom.
-  function requirementsColumns() {
-    const cols = [];
-    DAYS.forEach((day) => {
-      if (isPeriodDag(requirements[day.key])) {
-        cols.push({ dayKey: day.key, period: "middag", label: `${day.label}<br><small>middagspits</small>` });
-        cols.push({ dayKey: day.key, period: "avond", label: `${day.label}<br><small>avondspits</small>` });
-      } else {
-        cols.push({ dayKey: day.key, period: null, label: day.label });
-      }
-    });
-    return cols;
-  }
-  function requirementsInputId(col, taskKey) {
-    return `req-${col.dayKey}-${col.period || "dag"}-${taskKey}`;
-  }
-
-  function renderRequirementsOmslagInputs() {
-    const area = document.getElementById("requirements-omslag-area");
-    area.innerHTML = "";
-    DAYS.filter((day) => isPeriodDag(requirements[day.key])).forEach((day) => {
-      const label = document.createElement("label");
-      label.className = "contract-fields";
-      label.innerHTML = `Omslagtijd middag/avond op ${day.label}
-        <input type="time" id="omslag-${day.key}" value="${requirements[day.key].omslag || "16:30"}">`;
-      area.appendChild(label);
+      li.appendChild(checkBtn);
+      li.appendChild(dot);
+      li.appendChild(name);
+      li.appendChild(streak);
+      li.appendChild(delBtn);
+      list.appendChild(li);
     });
   }
 
-  function renderRequirementsTable() {
-    const table = document.getElementById("requirements-table");
-    const cols = requirementsColumns();
-    const thead = table.querySelector("thead tr");
-    thead.innerHTML = "<th>Taak</th>" + cols.map((c) => `<th>${c.label}</th>`).join("");
+  function renderWeekTable() {
+    var card = document.getElementById("weekCard");
+    var table = document.getElementById("weekTable");
+    table.innerHTML = "";
+    if (!habits.length) { card.hidden = true; return; }
+    card.hidden = false;
 
-    const tbody = document.createElement("tbody");
-    TASKS.forEach((task) => {
-      const tr = document.createElement("tr");
-      const tdLabel = document.createElement("td");
-      tdLabel.textContent = task.label;
-      tr.appendChild(tdLabel);
-      cols.forEach((col) => {
-        const td = document.createElement("td");
-        const input = document.createElement("input");
-        input.type = "number";
-        input.min = "0";
-        input.id = requirementsInputId(col, task.key);
-        const dayReqs = requirements[col.dayKey] || {};
-        input.value = col.period ? (dayReqs[col.period] || {})[task.key] || 0 : dayReqs[task.key] || 0;
-        td.appendChild(input);
+    var monday = mondayOf(startOfDay(new Date()));
+    var days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(monday, i));
+    var todayIso = todayISO();
+
+    var thead = document.createElement("thead");
+    var headRow = document.createElement("tr");
+    var corner = document.createElement("th");
+    corner.textContent = "";
+    headRow.appendChild(corner);
+    days.forEach(function (d) {
+      var th = document.createElement("th");
+      var iso = toISO(d);
+      if (iso === todayIso) th.className = "today-col";
+      th.innerHTML = DAYLABELS_MON_FIRST[(d.getDay() + 6) % 7] + "<br>" + d.getDate();
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement("tbody");
+    habits.forEach(function (h) {
+      var tr = document.createElement("tr");
+      var labelTd = document.createElement("td");
+      labelTd.className = "habit-label";
+      var dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.setProperty("--dot-color", colorVar(h));
+      labelTd.appendChild(dot);
+      var nameSpan = document.createElement("span");
+      nameSpan.textContent = h.name;
+      nameSpan.style.overflow = "hidden";
+      nameSpan.style.textOverflow = "ellipsis";
+      nameSpan.style.whiteSpace = "nowrap";
+      labelTd.appendChild(nameSpan);
+      tr.appendChild(labelTd);
+
+      days.forEach(function (d) {
+        var iso = toISO(d);
+        var td = document.createElement("td");
+        var btn = document.createElement("button");
+        btn.className = "week-cell-btn";
+        btn.style.setProperty("--check-color", colorVar(h));
+        if (iso === todayIso) btn.classList.add("is-today-col");
+        var future = iso > todayIso;
+        var checked = isChecked(h.id, iso);
+        btn.setAttribute("aria-pressed", checked ? "true" : "false");
+        btn.textContent = checked ? "✓" : "";
+        if (future) {
+          btn.disabled = true;
+          btn.title = "Nog niet zover";
+        } else {
+          btn.title = h.name + " — " + iso;
+          btn.addEventListener("click", function () { toggleChecked(h.id, iso); });
+        }
+        td.appendChild(btn);
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
     });
-    table.querySelector("tbody")?.remove();
-    table.appendChild(tbody);
-
-    renderRequirementsOmslagInputs();
-  }
-
-  document.getElementById("save-requirements-btn").addEventListener("click", () => {
-    const newReqs = {};
-    DAYS.forEach((day) => {
-      if (isPeriodDag(requirements[day.key])) {
-        const middag = {};
-        const avond = {};
-        TASKS.forEach((task) => {
-          const mVal = parseInt(document.getElementById(requirementsInputId({ dayKey: day.key, period: "middag" }, task.key)).value, 10) || 0;
-          if (mVal > 0) middag[task.key] = mVal;
-          const aVal = parseInt(document.getElementById(requirementsInputId({ dayKey: day.key, period: "avond" }, task.key)).value, 10) || 0;
-          if (aVal > 0) avond[task.key] = aVal;
-        });
-        const omslagInput = document.getElementById(`omslag-${day.key}`);
-        newReqs[day.key] = { omslag: (omslagInput && omslagInput.value) || "16:30", middag, avond };
-      } else {
-        newReqs[day.key] = {};
-        TASKS.forEach((task) => {
-          const val = parseInt(document.getElementById(requirementsInputId({ dayKey: day.key, period: null }, task.key)).value, 10) || 0;
-          if (val > 0) newReqs[day.key][task.key] = val;
-        });
-      }
-    });
-    requirements = newReqs;
-    saveRequirements(requirements);
-    const msg = document.getElementById("requirements-saved-msg");
-    msg.hidden = false;
-    setTimeout(() => (msg.hidden = true), 2000);
-  });
-
-  document.getElementById("reset-requirements-btn").addEventListener("click", () => {
-    if (!confirm("Bezetting terugzetten naar standaardwaarden?")) return;
-    requirements = JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
-    saveRequirements(requirements);
-    renderRequirementsTable();
-  });
-
-  // ---------- Openen & sluiten ----------
-
-  function renderOpenSluitTable() {
-    document.getElementById("sluitingstijd-input").value = sluitingstijd;
-    const tbody = document.createElement("tbody");
-    DAYS.forEach((day) => {
-      const settings = openSluit[day.key];
-      const tr = document.createElement("tr");
-
-      const tdDag = document.createElement("td");
-      tdDag.textContent = day.label;
-      tr.appendChild(tdDag);
-
-      const tdTijd = document.createElement("td");
-      const tijdTextarea = document.createElement("textarea");
-      tijdTextarea.id = `open-sluit-tijdsloten-${day.key}`;
-      tijdTextarea.rows = 4;
-      tijdTextarea.placeholder = '16:30 - 20:00\n17:00 - sluit';
-      tijdTextarea.value = settings.tijdsloten.join("\n");
-      tdTijd.appendChild(tijdTextarea);
-      tr.appendChild(tdTijd);
-
-      const tdOpeners = document.createElement("td");
-      const openersTextarea = document.createElement("textarea");
-      openersTextarea.id = `open-sluit-openers-${day.key}`;
-      openersTextarea.rows = 4;
-      openersTextarea.placeholder = "10:30,2";
-      openersTextarea.value = settings.openers.map((o) => `${o.tijd},${o.aantal}`).join("\n");
-      tdOpeners.appendChild(openersTextarea);
-      tr.appendChild(tdOpeners);
-
-      const tdSluiters = document.createElement("td");
-      const sluitersInput = document.createElement("input");
-      sluitersInput.type = "number";
-      sluitersInput.min = "0";
-      sluitersInput.id = `open-sluit-sluiters-${day.key}`;
-      sluitersInput.value = settings.sluiters;
-      tdSluiters.appendChild(sluitersInput);
-      tr.appendChild(tdSluiters);
-
-      tbody.appendChild(tr);
-    });
-    const table = document.getElementById("open-sluit-table");
-    table.querySelector("tbody")?.remove();
     table.appendChild(tbody);
   }
 
-  document.getElementById("save-open-sluit-btn").addEventListener("click", () => {
-    const next = {};
-    DAYS.forEach((day) => {
-      const tijdsloten = document
-        .getElementById(`open-sluit-tijdsloten-${day.key}`)
-        .value.split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const openers = document
-        .getElementById(`open-sluit-openers-${day.key}`)
-        .value.split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const [tijd, aantal] = line.split(",").map((s) => s.trim());
-          return { tijd, aantal: parseInt(aantal, 10) || 0 };
-        })
-        .filter((o) => o.tijd);
-      const sluiters = parseInt(document.getElementById(`open-sluit-sluiters-${day.key}`).value, 10) || 0;
-      next[day.key] = { tijdsloten, openers, sluiters };
+  function buildYearColumns(year) {
+    var jan1 = new Date(year, 0, 1);
+    var dec31 = new Date(year, 11, 31);
+    var firstMonday = mondayOf(jan1);
+    var lastSunday = addDays(mondayOf(dec31), 6);
+    var days = [];
+    for (var d = new Date(firstMonday); d <= lastSunday; d = addDays(d, 1)) days.push(new Date(d));
+    var columns = [];
+    for (var i = 0; i < days.length; i += 7) columns.push(days.slice(i, i + 7));
+    return columns;
+  }
+
+  function renderYearSection() {
+    var section = document.getElementById("yearSection");
+    section.innerHTML = "";
+    if (!habits.length) return;
+
+    var todayIso = todayISO();
+    var thisYear = new Date().getFullYear();
+
+    habits.forEach(function (h) {
+      var offset = yearOffsets[h.id] || 0;
+      var year = thisYear + offset;
+
+      var card = document.createElement("div");
+      card.className = "card";
+
+      var head = document.createElement("div");
+      head.className = "year-card-head";
+      var title = document.createElement("div");
+      title.className = "year-card-title";
+      var dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.setProperty("--dot-color", colorVar(h));
+      var titleText = document.createElement("span");
+      titleText.textContent = h.name;
+      title.appendChild(dot);
+      title.appendChild(titleText);
+
+      var nav = document.createElement("div");
+      nav.className = "year-nav";
+      var prevBtn = document.createElement("button");
+      prevBtn.type = "button";
+      prevBtn.textContent = "‹";
+      prevBtn.title = "Vorig jaar";
+      prevBtn.addEventListener("click", function () {
+        yearOffsets[h.id] = (yearOffsets[h.id] || 0) - 1;
+        renderYearSection();
+      });
+      var yearLabel = document.createElement("span");
+      yearLabel.textContent = String(year);
+      var nextBtn = document.createElement("button");
+      nextBtn.type = "button";
+      nextBtn.textContent = "›";
+      nextBtn.title = "Volgend jaar";
+      nextBtn.disabled = year >= thisYear;
+      nextBtn.addEventListener("click", function () {
+        yearOffsets[h.id] = (yearOffsets[h.id] || 0) + 1;
+        renderYearSection();
+      });
+      nav.appendChild(prevBtn);
+      nav.appendChild(yearLabel);
+      nav.appendChild(nextBtn);
+
+      head.appendChild(title);
+      head.appendChild(nav);
+      card.appendChild(head);
+
+      var stats = yearStats(h.id, year);
+      var statsWrap = document.createElement("div");
+      statsWrap.className = "year-stats";
+
+      function stat(value, label) {
+        var d = document.createElement("div");
+        d.className = "year-stat";
+        var v = document.createElement("div");
+        v.className = "year-stat-value";
+        v.textContent = value;
+        var l = document.createElement("div");
+        l.className = "year-stat-label";
+        l.textContent = label;
+        d.appendChild(v);
+        d.appendChild(l);
+        return d;
+      }
+      statsWrap.appendChild(stat(stats.count + " dagen", "Afgevinkt in " + year));
+      statsWrap.appendChild(stat(stats.pct + "%", "Van het jaar"));
+      if (year === thisYear) {
+        statsWrap.appendChild(stat(String(currentStreak(h.id)), "Huidige streak"));
+      }
+      statsWrap.appendChild(stat(String(longestStreak(h.id)), "Langste streak"));
+      card.appendChild(statsWrap);
+
+      // heatmap
+      var scroll = document.createElement("div");
+      scroll.className = "heatmap-scroll";
+      var inner = document.createElement("div");
+      inner.className = "heatmap-inner";
+
+      var columns = buildYearColumns(year);
+
+      var monthsRow = document.createElement("div");
+      monthsRow.className = "heatmap-months";
+      monthsRow.style.gridTemplateColumns = "repeat(" + columns.length + ", 12px)";
+      var lastMonthPrinted = -1;
+      columns.forEach(function (col) {
+        var label = document.createElement("span");
+        var monthStartCell = col.filter(function (d) { return d.getFullYear() === year && d.getDate() === 1; })[0];
+        if (monthStartCell && monthStartCell.getMonth() !== lastMonthPrinted) {
+          label.textContent = MONTHS_SHORT[monthStartCell.getMonth()];
+          lastMonthPrinted = monthStartCell.getMonth();
+        }
+        monthsRow.appendChild(label);
+      });
+
+      var body = document.createElement("div");
+      body.className = "heatmap-body";
+
+      var dayLabels = document.createElement("div");
+      dayLabels.className = "heatmap-daylabels";
+      DAYLABELS_MON_FIRST.forEach(function (lbl, idx) {
+        var s = document.createElement("span");
+        s.textContent = (idx % 2 === 1) ? lbl : "";
+        dayLabels.appendChild(s);
+      });
+
+      var grid = document.createElement("div");
+      grid.className = "heatmap-grid";
+      grid.style.gridTemplateColumns = "repeat(" + columns.length + ", 12px)";
+
+      columns.forEach(function (col) {
+        col.forEach(function (d) {
+          var iso = toISO(d);
+          var inYear = d.getFullYear() === year;
+          var cell = document.createElement("button");
+          cell.type = "button";
+          cell.className = "heat-cell";
+          cell.style.setProperty("--heat-color", colorVar(h));
+
+          if (!inYear) {
+            cell.dataset.empty = "1";
+            cell.disabled = true;
+            cell.tabIndex = -1;
+          } else if (iso > todayIso) {
+            cell.dataset.future = "1";
+            cell.disabled = true;
+            cell.title = d.getDate() + " " + MONTHS_LONG[d.getMonth()] + " " + year;
+          } else {
+            var checked = isChecked(h.id, iso);
+            cell.dataset.checked = checked ? "1" : "0";
+            cell.title = d.getDate() + " " + MONTHS_LONG[d.getMonth()] + " " + year + (checked ? " — afgevinkt" : " — niet afgevinkt");
+            cell.addEventListener("click", function () { toggleChecked(h.id, iso); });
+          }
+          grid.appendChild(cell);
+        });
+      });
+
+      body.appendChild(dayLabels);
+      body.appendChild(grid);
+      inner.appendChild(monthsRow);
+      inner.appendChild(body);
+      scroll.appendChild(inner);
+      card.appendChild(scroll);
+
+      var legend = document.createElement("div");
+      legend.className = "heatmap-legend";
+      var sw1 = document.createElement("span");
+      sw1.className = "legend-swatch";
+      var sw2 = document.createElement("span");
+      sw2.className = "legend-swatch on";
+      sw2.style.setProperty("--heat-color", colorVar(h));
+      legend.appendChild(document.createTextNode("Niet gedaan"));
+      legend.appendChild(sw1);
+      legend.appendChild(sw2);
+      legend.appendChild(document.createTextNode("Gedaan"));
+      card.appendChild(legend);
+
+      section.appendChild(card);
     });
-    openSluit = next;
-    saveOpenSluit(openSluit);
-    sluitingstijd = document.getElementById("sluitingstijd-input").value || DEFAULT_SLUITINGSTIJD;
-    saveSluitingstijd(sluitingstijd);
-    // Tijdopties per dag zijn veranderd: bouw de aanvink-lijsten in het medewerkersformulier opnieuw op.
-    buildDagenRows(vasteDagenContainer, DAYS, "vast");
-    buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
-    const msg = document.getElementById("open-sluit-saved-msg");
-    msg.hidden = false;
-    setTimeout(() => (msg.hidden = true), 2000);
+  }
+
+  function deleteHabit(id) {
+    habits = habits.filter(function (h) { return h.id !== id; });
+    saveHabits(habits);
+    delete checks[id];
+    saveChecks(checks);
+    delete yearOffsets[id];
+    renderAll();
+  }
+
+  function addHabit(name, colorKey) {
+    var habit = { id: uid(), name: name, color: colorKey, createdAt: todayISO() };
+    habits.push(habit);
+    saveHabits(habits);
+    renderAll();
+  }
+
+  function renderAll() {
+    renderHeroDate();
+    renderHeroProgress();
+    renderTodayList();
+    renderWeekTable();
+    renderYearSection();
+  }
+
+  // ---------- form ----------
+  document.getElementById("addHabitForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = document.getElementById("habitNameInput");
+    var name = input.value.trim();
+    if (!name) return;
+    addHabit(name, selectedColorKey());
+    input.value = "";
+    input.focus();
   });
 
-  // ---------- Onmogelijke combinaties ----------
-
-  function renderForbiddenEmployeeSelects() {
-    const optionsHtml = employees
-      .slice()
-      .sort((a, b) => a.naam.localeCompare(b.naam))
-      .map((e) => `<option value="${e.id}">${e.naam}</option>`)
-      .join("");
-    const selA = document.getElementById("forbidden-emp-a");
-    const selB = document.getElementById("forbidden-emp-b");
-    if (selA) selA.innerHTML = optionsHtml;
-    if (selB) selB.innerHTML = optionsHtml;
-  }
-
-  function renderForbiddenPairsList() {
-    const ul = document.getElementById("forbidden-pairs-list");
-    ul.innerHTML = "";
-    Object.entries(forbiddenPairs).forEach(([taskKey, pairs]) => {
-      pairs.forEach((pair, idx) => {
-        const empA = employees.find((e) => e.id === pair[0]);
-        const empB = employees.find((e) => e.id === pair[1]);
-        if (!empA || !empB) return;
-        const li = document.createElement("li");
-        li.textContent = `${taskLabel(taskKey)}: ${empA.naam} + ${empB.naam} `;
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.textContent = "✕";
-        btn.addEventListener("click", () => {
-          forbiddenPairs[taskKey].splice(idx, 1);
-          if (!forbiddenPairs[taskKey].length) delete forbiddenPairs[taskKey];
-          saveForbiddenPairs(forbiddenPairs);
-          renderForbiddenPairsList();
-        });
-        li.appendChild(btn);
-        ul.appendChild(li);
-      });
-    });
-  }
-
-  function renderForbiddenTaskSelect() {
-    document.getElementById("forbidden-task").innerHTML = TASKS.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
-  }
-
-  document.getElementById("add-forbidden-pair-btn").addEventListener("click", () => {
-    const task = document.getElementById("forbidden-task").value;
-    const a = document.getElementById("forbidden-emp-a").value;
-    const b = document.getElementById("forbidden-emp-b").value;
-    if (!a || !b || a === b) {
-      alert("Kies twee verschillende medewerkers.");
-      return;
-    }
-    forbiddenPairs[task] = forbiddenPairs[task] || [];
-    const exists = forbiddenPairs[task].some((p) => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a));
-    if (!exists) forbiddenPairs[task].push([a, b]);
-    saveForbiddenPairs(forbiddenPairs);
-    renderForbiddenPairsList();
-  });
-
-  // ---------- Week helpers ----------
-
-  function isoWeekStringFor(date) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-    return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
-  }
-
-  function computeWeekDates(weekValue) {
-    const [yearStr, weekStr] = weekValue.split("-W");
-    const year = parseInt(yearStr, 10);
-    const week = parseInt(weekStr, 10);
-    const simple = new Date(Date.UTC(year, 0, 4));
-    const dayOfWeek = simple.getUTCDay() || 7;
-    const monday = new Date(simple);
-    monday.setUTCDate(simple.getUTCDate() - dayOfWeek + 1 + (week - 1) * 7);
-    return DAYS.map((d) => {
-      const offset = d.jsDay === 0 ? 6 : d.jsDay - 1;
-      const dt = new Date(monday);
-      dt.setUTCDate(monday.getUTCDate() + offset);
-      return Object.assign({}, d, { dateIso: dt.toISOString().slice(0, 10) });
-    });
-  }
-
-  const weekPicker = document.getElementById("week-picker");
-  weekPicker.value = isoWeekStringFor(new Date());
-
-  // ---------- Contracturen ----------
-
-  // Bepaalt per dag wie er die dag ergens is ingepland, wijst daar (via
-  // assignTijdslotenForDay) een concreet tijdslot aan toe, en telt de uren op basis
-  // van de daadwerkelijk gekozen tijdopties (met "sluit" omgerekend via sluitingstijd).
-  function computeHoursForEmployeeInWeek(emp, scheduleData, weekValue) {
-    let hours = 0;
-    const schedule = scheduleData.schedule;
-    const weekDates = computeWeekDates(weekValue);
-    const dateIsoByDay = {};
-    weekDates.forEach((d) => (dateIsoByDay[d.key] = d.dateIso));
-    Object.keys(schedule).forEach((dayKey) => {
-      const idsToday = new Set();
-      Object.keys(schedule[dayKey]).forEach((task) => {
-        (schedule[dayKey][task] || []).forEach((id) => {
-          if (id) idsToday.add(id);
-        });
-      });
-      if (!idsToday.has(emp.id)) return;
-      const auto = assignTijdslotenForDay(dayKey, dateIsoByDay[dayKey], Array.from(idsToday));
-      const { assignments } = mergeTijdslotOverrides(dayKey, auto.assignments, auto.warnings, scheduleData);
-      const opt = assignments[emp.id];
-      if (opt) hours += durationHours(opt.start, opt.eind);
-    });
-    return hours;
-  }
-
-  // Optelsom van (gewerkt - doel) over alle eerder gegenereerde weken, zodat een
-  // tekort of overschot automatisch meetelt bij het bepalen van de volgende periode.
-  function computeSaldoBeforeWeek(emp, weekValue) {
-    const target = weeklyTargetHoursFor(emp);
-    if (target === null) return 0;
-    let saldo = 0;
-    listStoredWeeksBefore(weekValue).forEach((w) => {
-      const data = loadSchedule(w);
-      if (!data) return;
-      saldo += computeHoursForEmployeeInWeek(emp, data, w) - target;
-    });
-    return saldo;
-  }
-
-  // ---------- Schedule generation ----------
-
-  function generateSchedule(weekDates, reqs, weekValue) {
-    const shiftCount = {};
-    const saldoBefore = {};
-    const effectiveTargetShifts = {};
-    const gemiddeldeUren = gemiddeldeUrenPerDienstGeschat();
-    employees.forEach((e) => {
-      shiftCount[e.id] = 0;
-      saldoBefore[e.id] = computeSaldoBeforeWeek(e, weekValue);
-      const baseTarget = weeklyTargetHoursFor(e);
-      if (baseTarget === null) {
-        effectiveTargetShifts[e.id] = null;
-      } else {
-        // Tekort van eerdere weken verhoogt dit weekdoel; overschot verlaagt het.
-        // Begrensd zodat een lang tekort niet in één week ingehaald hoeft te worden.
-        // Omgerekend naar een geschat aantal diensten, omdat de exacte uren pas na de
-        // tijdslot-toewijzing bekend zijn — de contracturenweergave rekent wél precies.
-        const adjustedHours = Math.max(0, Math.min(baseTarget - saldoBefore[e.id], baseTarget * 2));
-        effectiveTargetShifts[e.id] = adjustedHours / gemiddeldeUren;
-      }
-    });
-
-    // Wie nog onder het minimum van 2 diensten zit, of wie (bij een vast contract) nog
-    // niet aan het (voor eerdere over/onderschotten gecorrigeerde, geschatte) aantal
-    // diensten zit, krijgt voorrang boven mensen die al genoeg hebben. Binnen die
-    // groepen geldt eerlijke verdeling op basis van aantal diensten tot nu toe.
-    const needsMore = (e) => {
-      if (effectiveTargetShifts[e.id] !== null) return shiftCount[e.id] < effectiveTargetShifts[e.id];
-      return shiftCount[e.id] < MIN_SHIFTS_PER_WEEK;
-    };
-    const byPriority = (a, b) => {
-      const tierA = needsMore(a) ? 0 : 1;
-      const tierB = needsMore(b) ? 0 : 1;
-      if (tierA !== tierB) return tierA - tierB;
-      return shiftCount[a.id] - shiftCount[b.id] || a.naam.localeCompare(b.naam);
-    };
-
-    function heeftDienstaanvraag(e, day, task) {
-      return (e.dienstAanvragen || []).some((a) => a.datum === day.dateIso && a.taak === task);
-    }
-
-    // Kiest kandidaten voor een taak/dag, met voorrang zoals hierboven, verboden koppels
-    // vermeden, en optioneel een extra geschiktheidscheck (bijv. "kan die dag voor 16:30
-    // beginnen") voor het dagdeel-scenario hieronder. Gedeeltelijk verlof (vanaf/tot
-    // tijdstip) sluit iemand niet bij voorbaat uit — alleen hele-dag-verlof doet dat.
-    function pickCandidates(day, task, count, excludeIds, extraEligibleFn) {
-      const pairs = forbiddenPairs[task] || [];
-      const conflicts = (candidate, chosenSoFar) =>
-        chosenSoFar.some((c) => pairs.some((p) => p.includes(c.id) && p.includes(candidate.id)));
-      const eligible = (e) =>
-        employeeCanDoTask(e, task) &&
-        !isTaakUitgeslotenOpDag(e, task, day.key) &&
-        e.dagen[day.key] &&
-        !hasFullDayVerlof(e, day.dateIso) &&
-        !excludeIds.has(e.id) &&
-        (!extraEligibleFn || extraEligibleFn(e));
-      // Een openstaande dienstaanvraag voor precies deze taak/datum gaat vóór de gewone
-      // eerlijke-verdeling-voorrang.
-      // Wie deze taak als voorkeur-/hoofdtaak heeft, gaat vóór wie hem alleen secundair
-      // (kan het, maar doet het niet vaak/niet het liefst) heeft — behalve bij een expliciete
-      // dienstaanvraag, die altijd voorrang houdt.
-      const isSecundairVoorTaak = (e) =>
-        isSecundaireTaak(e, task) || (task === "assistentplaat" && !e.taken.includes("assistentplaat") && e.taken.includes("hoofdplaat"));
-      const byPriorityMetAanvraag = (a, b) => {
-        const reqA = heeftDienstaanvraag(a, day, task) ? 0 : 1;
-        const reqB = heeftDienstaanvraag(b, day, task) ? 0 : 1;
-        if (reqA !== reqB) return reqA - reqB;
-        const secA = isSecundairVoorTaak(a) ? 1 : 0;
-        const secB = isSecundairVoorTaak(b) ? 1 : 0;
-        if (secA !== secB) return secA - secB;
-        return byPriority(a, b);
-      };
-
-      const vasteCandidates = employees
-        .filter((e) => eligible(e) && e.dagen[day.key].type === "vast")
-        .sort(byPriorityMetAanvraag);
-      const beschikbaarCandidates = employees
-        .filter((e) => eligible(e) && e.dagen[day.key].type === "beschikbaar")
-        .sort(byPriorityMetAanvraag);
-
-      const chosen = [];
-      for (const cand of vasteCandidates) {
-        if (chosen.length >= count) break;
-        if (conflicts(cand, chosen)) continue;
-        chosen.push(cand);
-      }
-      if (chosen.length < count) {
-        for (const cand of beschikbaarCandidates) {
-          if (chosen.length >= count) break;
-          if (conflicts(cand, chosen)) continue;
-          chosen.push(cand);
-        }
-      }
-      return chosen;
-    }
-
-    const schedule = {};
-    const warnings = [];
-
-    weekDates.forEach((day) => {
-      schedule[day.key] = {};
-      const dayReqs = reqs[day.key] || {};
-
-      if (isPeriodDag(dayReqs)) {
-        const cutoff = timeToMinutes(dayReqs.omslag || "16:30");
-        // Per medewerker het taak waarop die dag al is ingedeeld (over beide periodes heen) —
-        // iemand mag voor dezelfde taak in beide periodes meetellen (één lange dienst dekt
-        // dan allebei), maar niet voor twee verschillende taken op dezelfde dag.
-        const assignedTaskToday = {};
-        const relevantTasks = TASKS.filter(
-          (t) => (dayReqs.middag && dayReqs.middag[t.key] > 0) || (dayReqs.avond && dayReqs.avond[t.key] > 0)
-        );
-
-        relevantTasks.forEach((taskDef) => {
-          const task = taskDef.key;
-          const middagCount = (dayReqs.middag && dayReqs.middag[task]) || 0;
-          const avondCount = (dayReqs.avond && dayReqs.avond[task]) || 0;
-          const excludeAndereTaak = () =>
-            new Set(Object.keys(assignedTaskToday).filter((id) => assignedTaskToday[id] !== task));
-
-          let middagChosen = [];
-          if (middagCount > 0) {
-            middagChosen = pickCandidates(day, task, middagCount, excludeAndereTaak(), (e) =>
-              employeeTijdslotOptions(e, day.key, day.dateIso).some((o) => timeToMinutes(o.start) < cutoff)
-            );
-            middagChosen.forEach((e) => {
-              assignedTaskToday[e.id] = task;
-              shiftCount[e.id]++;
-            });
-            const ids = middagChosen.map((e) => e.id);
-            while (ids.length < middagCount) ids.push(null);
-            schedule[day.key][periodTaskKey(task, "middag")] = ids;
-            if (middagChosen.length < middagCount) {
-              warnings.push(
-                `${day.label} (middagspits) ${day.dateIso}: ${middagCount - middagChosen.length} tekort voor ${taskLabel(task)}`
-              );
-            }
-          }
-
-          if (avondCount > 0) {
-            const avondChosen = pickCandidates(day, task, avondCount, excludeAndereTaak(), (e) =>
-              employeeTijdslotOptions(e, day.key, day.dateIso).some(
-                (o) => (o.eind === "sluit" ? timeToMinutes(sluitingstijd) : timeToMinutes(o.eind)) > cutoff
-              )
-            );
-            avondChosen.forEach((e) => {
-              const dekteAlMiddag = middagChosen.some((m) => m.id === e.id);
-              assignedTaskToday[e.id] = task;
-              if (!dekteAlMiddag) shiftCount[e.id]++;
-            });
-            const ids = avondChosen.map((e) => e.id);
-            while (ids.length < avondCount) ids.push(null);
-            schedule[day.key][periodTaskKey(task, "avond")] = ids;
-            if (avondChosen.length < avondCount) {
-              warnings.push(
-                `${day.label} (avondspits) ${day.dateIso}: ${avondCount - avondChosen.length} tekort voor ${taskLabel(task)}`
-              );
-            }
-          }
-        });
-      } else {
-        const taskEntries = Object.entries(dayReqs).filter(([, count]) => count > 0);
-        const totalPool = (task) =>
-          employees.filter(
-            (e) => employeeCanDoTask(e, task) && !isTaakUitgeslotenOpDag(e, task, day.key) && e.dagen[day.key] && !hasFullDayVerlof(e, day.dateIso)
-          ).length;
-        // Meest schaarse taak (minste kandidaten t.o.v. behoefte) eerst toewijzen.
-        taskEntries.sort((a, b) => (totalPool(a[0]) - a[1]) - (totalPool(b[0]) - b[1]));
-
-        const assignedToday = new Set();
-        taskEntries.forEach(([task, count]) => {
-          const chosen = pickCandidates(day, task, count, assignedToday, null);
-          chosen.forEach((e) => {
-            assignedToday.add(e.id);
-            shiftCount[e.id]++;
-          });
-          const ids = chosen.map((e) => e.id);
-          while (ids.length < count) ids.push(null);
-          schedule[day.key][task] = ids;
-          if (chosen.length < count) {
-            warnings.push(`${day.label} ${day.dateIso}: ${count - chosen.length} tekort voor ${taskLabel(task)}`);
-          }
-        });
-      }
-    });
-
-    // Tekorten aan taken-bezetting zitten al in `warnings`; het minimum van 2 diensten en
-    // eventuele open/sluit-tekorten worden na het opslaan herberekend via computeWarningsFromCurrent().
-    return { schedule, warnings };
-  }
-
-  // ---------- Schedule rendering ----------
-
-  function employeesForTask(task) {
-    return employees.filter((e) => employeeCanDoTask(e, task)).sort((a, b) => a.naam.localeCompare(b.naam));
-  }
-
-  function renderScheduleTable() {
-    const table = document.getElementById("schedule-table");
-    const emptyMsg = document.getElementById("schedule-empty-msg");
-
-    if (!currentScheduleData || !currentWeekDates) {
-      table.innerHTML = "";
-      emptyMsg.hidden = false;
-      return;
-    }
-    emptyMsg.hidden = true;
-
-    const { schedule, requirementsSnapshot } = currentScheduleData;
-    const relevantTasks = TASKS.filter((task) =>
-      currentWeekDates.some((day) => getCellGroups(requirementsSnapshot[day.key], task.key).length > 0)
-    );
-
-    let html = "<thead><tr><th>Taak</th>";
-    currentWeekDates.forEach((day) => {
-      html += `<th>${day.label}<br><small>${day.dateIso}</small></th>`;
-    });
-    html += "</tr></thead><tbody>";
-
-    relevantTasks.forEach((task) => {
-      html += `<tr><td>${task.label}</td>`;
-      currentWeekDates.forEach((day) => {
-        const groups = getCellGroups(requirementsSnapshot[day.key], task.key);
-        if (!groups.length) {
-          html += "<td>—</td>";
-          return;
-        }
-        const anyEmpty = groups.some((group) => (schedule[day.key][group.scheduleKey] || []).some((id) => !id));
-        const keysAttr = groups.map((g) => g.scheduleKey).join(",");
-        html += `<td data-day="${day.key}" data-keys="${keysAttr}" class="${anyEmpty ? "understaffed" : ""}">`;
-        groups.forEach((group) => {
-          if (group.label) html += `<div class="period-label">${group.label}</div>`;
-          const ids = schedule[day.key][group.scheduleKey] || [];
-          for (let i = 0; i < group.count; i++) {
-            const currentId = ids[i] || "";
-            html += `<select data-day="${day.key}" data-task="${group.scheduleKey}" data-idx="${i}">`;
-            html += `<option value="" class="slot-empty-option">— leeg —</option>`;
-            employeesForTask(task.key).forEach((emp) => {
-              const selected = emp.id === currentId ? "selected" : "";
-              const dagInfo = emp.dagen[day.key];
-              let suffix = dagInfo && dagInfo.type === "beschikbaar" ? " (beschikbaar)" : "";
-              if (task.key === "assistentplaat" && !emp.taken.includes("assistentplaat") && emp.taken.includes("hoofdplaat")) {
-                suffix += " (als hoofd)";
-              } else if (isSecundaireTaak(emp, task.key)) {
-                suffix += " (secundair)";
-              }
-              html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
-            });
-            html += `</select>`;
-            html += `<input type="text" class="tijdslot-badge" data-day="${day.key}" data-task="${group.scheduleKey}" data-idx="${i}" placeholder="tijd typen, bv. 16:00 - sluit">`;
-          }
-        });
-        html += "</td>";
-      });
-      html += "</tr>";
-    });
-    html += "</tbody>";
-    table.innerHTML = html;
-
-    table.querySelectorAll("select").forEach((select) => {
-      applySelectWarningClass(select);
-      select.addEventListener("change", onScheduleSelectChange);
-    });
-    table.querySelectorAll("input.tijdslot-badge").forEach((input) => {
-      input.addEventListener("change", onTijdslotBadgeChange);
-    });
-    refreshTijdslotBadges();
-  }
-
-  function applySelectWarningClass(select) {
-    const day = select.dataset.day;
-    const empId = select.value;
-    select.classList.remove("not-fixed-day", "on-verlof", "beschikbaar", "onervaren");
-    if (!empId) return;
-    const emp = employees.find((e) => e.id === empId);
-    if (!emp) return;
-    const dayInfo = currentWeekDates.find((d) => d.key === day);
-    const dagInfo = emp.dagen[day];
-    if (!dagInfo) {
-      select.classList.add("not-fixed-day");
-    } else if (dagInfo.type === "beschikbaar") {
-      select.classList.add("beschikbaar");
-    }
-    if (isTaakUitgeslotenOpDag(emp, baseTaskKey(select.dataset.task), day)) {
-      select.classList.add("onervaren");
-    }
-    if (dayInfo) {
-      const verlofEntry = verlofEntryFor(emp, dayInfo.dateIso);
-      if (verlofEntry) {
-        select.classList.add("on-verlof");
-        select.title = `Verlof: ${verlofEntryLabel(verlofEntry)}`;
-      } else {
-        select.title = "";
-      }
-    }
-  }
-
-  // Herberekent per dag welk tijdslot elke ingedeelde medewerker krijgt (openers/sluiters/rest)
-  // en zet dat als klein label onder de bijbehorende select.
-  function refreshTijdslotBadges() {
-    if (!currentScheduleData || !currentWeekDates) return;
-    const { schedule } = currentScheduleData;
-    currentWeekDates.forEach((day) => {
-      const idsToday = new Set();
-      Object.keys(schedule[day.key] || {}).forEach((task) => {
-        (schedule[day.key][task] || []).forEach((id) => {
-          if (id) idsToday.add(id);
-        });
-      });
-      const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
-      const { assignments } = mergeTijdslotOverrides(day.key, auto.assignments, auto.warnings, currentScheduleData);
-      const dayOverrides = (currentScheduleData.tijdslotOverrides && currentScheduleData.tijdslotOverrides[day.key]) || {};
-      document.querySelectorAll(`.tijdslot-badge[data-day="${day.key}"]`).forEach((badge) => {
-        const task = badge.dataset.task;
-        const idx = Number(badge.dataset.idx);
-        const id = (schedule[day.key][task] || [])[idx];
-        badge.classList.remove("tijdslot-missing", "tijdslot-overridden");
-        if (!id) {
-          badge.value = "";
-          badge.disabled = true;
-          badge.placeholder = "";
-          return;
-        }
-        badge.disabled = false;
-        if (dayOverrides[id]) {
-          badge.value = dayOverrides[id];
-          badge.classList.add("tijdslot-overridden");
-          return;
-        }
-        const opt = assignments[id];
-        if (opt) {
-          badge.value = `${opt.start} - ${opt.eind === "sluit" ? "sluit" : opt.eind}`;
-        } else {
-          badge.value = "";
-          badge.placeholder = "geen tijdoptie — typ zelf een tijd";
-          badge.classList.add("tijdslot-missing");
-        }
-      });
-    });
-  }
-
-  function onScheduleSelectChange(e) {
-    const select = e.target;
-    const { day, task, idx } = select.dataset;
-    const ids = currentScheduleData.schedule[day][task];
-    ids[Number(idx)] = select.value || null;
-    saveSchedule(currentWeekValue, currentScheduleData);
-    applySelectWarningClass(select);
-    updateUnderstaffedHighlight();
-    refreshTijdslotBadges();
-    renderWarnings(computeWarningsFromCurrent());
-    renderContractProgress();
-  }
-
-  // Slaat een handmatig getypte tijd op als overschrijving van de automatisch berekende
-  // tijdslot-toewijzing voor deze medewerker op deze dag (leeg maken herstelt de automatische tijd).
-  function onTijdslotBadgeChange(e) {
-    const input = e.target;
-    const { day, task, idx } = input.dataset;
-    const id = (currentScheduleData.schedule[day][task] || [])[Number(idx)];
-    if (!id) return;
-    if (!currentScheduleData.tijdslotOverrides) currentScheduleData.tijdslotOverrides = {};
-    if (!currentScheduleData.tijdslotOverrides[day]) currentScheduleData.tijdslotOverrides[day] = {};
-    const value = input.value.trim();
-    if (value) {
-      currentScheduleData.tijdslotOverrides[day][id] = value;
+  // ---------- theme toggle ----------
+  function applyTheme(theme) {
+    if (theme === "light" || theme === "dark") {
+      document.documentElement.setAttribute("data-theme", theme);
     } else {
-      delete currentScheduleData.tijdslotOverrides[day][id];
+      document.documentElement.removeAttribute("data-theme");
     }
-    saveSchedule(currentWeekValue, currentScheduleData);
-    refreshTijdslotBadges();
-    renderWarnings(computeWarningsFromCurrent());
-    renderContractProgress();
   }
-
-  function updateUnderstaffedHighlight() {
-    document.querySelectorAll("#schedule-table td[data-day]").forEach((td) => {
-      const day = td.dataset.day;
-      const keys = td.dataset.keys.split(",");
-      const anyEmpty = keys.some((key) => (currentScheduleData.schedule[day][key] || []).some((id) => !id));
-      td.classList.toggle("understaffed", anyEmpty);
-    });
-  }
-
-  function computeShiftCountsFromSchedule(scheduleData) {
-    const counts = {};
-    employees.forEach((e) => (counts[e.id] = 0));
-    Object.keys(scheduleData.schedule).forEach((dayKey) => {
-      // Per dag dedupliceren: iemand die zowel middag- als avondspits van dezelfde taak
-      // dekt (één lange dienst) telt voor de eerlijke verdeling als 1 dienst, niet 2.
-      const idsToday = new Set();
-      Object.keys(scheduleData.schedule[dayKey]).forEach((task) => {
-        (scheduleData.schedule[dayKey][task] || []).forEach((id) => {
-          if (id) idsToday.add(id);
-        });
-      });
-      idsToday.forEach((id) => {
-        if (counts[id] !== undefined) counts[id]++;
-      });
-    });
-    return counts;
-  }
-
-  function computeWarningsFromCurrent() {
-    const warnings = [];
-    if (!currentScheduleData) return warnings;
-    const { schedule, requirementsSnapshot } = currentScheduleData;
-    currentWeekDates.forEach((day) => {
-      const dayReqs = requirementsSnapshot[day.key] || {};
-      TASKS.forEach((task) => {
-        getCellGroups(dayReqs, task.key).forEach((group) => {
-          const ids = schedule[day.key][group.scheduleKey] || [];
-          const filled = ids.filter((id) => id).length;
-          if (filled < group.count) {
-            const suffix = group.label ? ` (${group.label})` : "";
-            warnings.push(
-              `${day.label}${suffix} ${day.dateIso}: ${group.count - filled} tekort voor ${taskLabel(task.key)}`
-            );
-          }
-        });
-      });
-    });
-
-    const shiftCounts = computeShiftCountsFromSchedule(currentScheduleData);
-    employees.forEach((e) => {
-      if (shiftCounts[e.id] >= MIN_SHIFTS_PER_WEEK) return;
-      const potentieleDagen = currentWeekDates.filter(
-        (day) =>
-          e.dagen[day.key] &&
-          !hasFullDayVerlof(e, day.dateIso) &&
-          TASKS.some((t) => employeeCanDoTask(e, t.key) && getCellGroups(requirementsSnapshot[day.key], t.key).length > 0)
-      ).length;
-      if (potentieleDagen >= MIN_SHIFTS_PER_WEEK) {
-        warnings.push(
-          `${e.naam} heeft maar ${shiftCounts[e.id]} dienst(en) deze week (streefdoel: minimaal ${MIN_SHIFTS_PER_WEEK}).`
-        );
-      }
-    });
-
-    currentWeekDates.forEach((day) => {
-      const idsToday = new Set();
-      Object.keys(schedule[day.key] || {}).forEach((task) => {
-        (schedule[day.key][task] || []).forEach((id) => {
-          if (id) idsToday.add(id);
-        });
-      });
-      const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
-      const { warnings: tijdslotWarnings } = mergeTijdslotOverrides(day.key, auto.assignments, auto.warnings, currentScheduleData);
-      warnings.push(...tijdslotWarnings);
-    });
-
-    // Leidinggevenden (bijv. Roeland) die nooit alleen op een taak mogen staan — per dagdeel
-    // gecheckt, zodat "alleen tijdens de middagspits" ook wordt opgemerkt.
-    employees.forEach((e) => {
-      if (!e.nooitAlleenBij) return;
-      currentWeekDates.forEach((day) => {
-        const dayReqs = requirementsSnapshot[day.key] || {};
-        getCellGroups(dayReqs, e.nooitAlleenBij).forEach((group) => {
-          const ids = (schedule[day.key][group.scheduleKey] || []).filter((id) => id);
-          if (ids.includes(e.id) && ids.length === 1) {
-            const suffix = group.label ? ` (${group.label})` : "";
-            warnings.push(
-              `${e.naam} staat op ${day.label}${suffix} alleen bij ${taskLabel(e.nooitAlleenBij)} — moet samen met iemand anders staan.`
-            );
-          }
-        });
-      });
-    });
-
-    // Handmatig ingepland op een taak/dag waarvoor deze medewerker (nog) niet ervaren genoeg is.
-    currentWeekDates.forEach((day) => {
-      Object.keys(schedule[day.key] || {}).forEach((scheduleKey) => {
-        const task = baseTaskKey(scheduleKey);
-        (schedule[day.key][scheduleKey] || []).forEach((id) => {
-          if (!id) return;
-          const emp = employees.find((e) => e.id === id);
-          if (emp && isTaakUitgeslotenOpDag(emp, task, day.key)) {
-            warnings.push(
-              `${emp.naam} staat op ${day.label} bij ${taskLabel(task)}, maar is daar op die dag (nog) niet ervaren genoeg voor.`
-            );
-          }
-        });
-      });
-    });
-
-    return warnings;
-  }
-
-  function renderContractProgress() {
-    const panel = document.getElementById("contract-progress-panel");
-    const tbody = document.querySelector("#contract-progress-table tbody");
-    if (!currentScheduleData || !currentWeekValue) {
-      panel.hidden = true;
-      return;
-    }
-    const contractEmployees = employees.filter((e) => weeklyTargetHoursFor(e) !== null);
-    if (!contractEmployees.length) {
-      panel.hidden = true;
-      return;
-    }
-    panel.hidden = false;
-    tbody.innerHTML = "";
-    contractEmployees
-      .slice()
-      .sort((a, b) => a.naam.localeCompare(b.naam))
-      .forEach((emp) => {
-        const baseTarget = weeklyTargetHoursFor(emp);
-        const saldoBefore = computeSaldoBeforeWeek(emp, currentWeekValue);
-        const effectiveTarget = Math.max(0, Math.min(baseTarget - saldoBefore, baseTarget * 2));
-        const actual = computeHoursForEmployeeInWeek(emp, currentScheduleData, currentWeekValue);
-        const saldoAfter = saldoBefore + (actual - baseTarget);
-        const saldoClass = saldoAfter < -0.05 ? "saldo-tekort" : saldoAfter > 0.05 ? "saldo-overschot" : "";
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${emp.naam}</td>
-          <td>${effectiveTarget.toFixed(1)}u${
-          Math.abs(saldoBefore) > 0.05
-            ? ` <small>(basis ${baseTarget.toFixed(1)}u, saldo daarvoor ${saldoBefore > 0 ? "+" : ""}${saldoBefore.toFixed(1)}u)</small>`
-            : ""
-        }</td>
-          <td>${actual.toFixed(1)}u</td>
-          <td class="${saldoClass}">${saldoAfter > 0 ? "+" : ""}${saldoAfter.toFixed(1)}u</td>
-        `;
-        tbody.appendChild(tr);
-      });
-  }
-
-  function renderWarnings(warnings) {
-    const box = document.getElementById("warnings-box");
-    if (!warnings.length) {
-      box.hidden = true;
-      box.innerHTML = "";
-      return;
-    }
-    box.hidden = false;
-    box.innerHTML =
-      "<strong>Let op, niet volledig bezet:</strong><ul>" +
-      warnings.map((w) => `<li>${w}</li>`).join("") +
-      "</ul>";
-  }
-
-  document.getElementById("generate-btn").addEventListener("click", () => {
-    const weekValue = weekPicker.value || isoWeekStringFor(new Date());
-    currentWeekValue = weekValue;
-    currentWeekDates = computeWeekDates(weekValue);
-    const requirementsSnapshot = JSON.parse(JSON.stringify(requirements));
-    const { schedule } = generateSchedule(currentWeekDates, requirementsSnapshot, weekValue);
-    currentScheduleData = { schedule, requirementsSnapshot, tijdslotOverrides: {} };
-    saveSchedule(currentWeekValue, currentScheduleData);
-    renderScheduleTable();
-    renderWarnings(computeWarningsFromCurrent());
-    renderContractProgress();
+  var savedTheme = localStorage.getItem(STORAGE_THEME) || "auto";
+  applyTheme(savedTheme);
+  document.getElementById("themeToggle").addEventListener("click", function () {
+    var current = localStorage.getItem(STORAGE_THEME) || "auto";
+    var order = { auto: "light", light: "dark", dark: "auto" };
+    var next = order[current];
+    localStorage.setItem(STORAGE_THEME, next);
+    applyTheme(next);
   });
 
-  // Load a previously saved schedule for the currently selected week, if any.
-  function tryLoadExistingSchedule() {
-    const weekValue = weekPicker.value || isoWeekStringFor(new Date());
-    const saved = loadSchedule(weekValue);
-    if (saved) {
-      currentWeekValue = weekValue;
-      currentWeekDates = computeWeekDates(weekValue);
-      if (!saved.tijdslotOverrides) saved.tijdslotOverrides = {};
-      currentScheduleData = saved;
-      renderScheduleTable();
-      renderWarnings(computeWarningsFromCurrent());
-      renderContractProgress();
-    } else {
-      currentWeekValue = weekValue;
-      currentWeekDates = computeWeekDates(weekValue);
-      currentScheduleData = null;
-      renderScheduleTable();
-      renderWarnings([]);
-      renderContractProgress();
+  renderColorPicker();
+  renderAll();
+
+  // keep "today" fresh if the tab stays open across midnight
+  setInterval(function () {
+    if (document.getElementById("todayFull").dataset.iso !== todayISO()) {
+      renderAll();
     }
-  }
-
-  weekPicker.addEventListener("change", tryLoadExistingSchedule);
-
-  // ---------- Vrijvraging ----------
-
-  const verlofWeekPicker = document.getElementById("verlof-week-picker");
-  verlofWeekPicker.value = isoWeekStringFor(new Date());
-
-  // Bepaalt of er op een dag al zoveel verlof is (goedgekeurd via de vrije-dagen-inputs)
-  // dat de bezetting niet meer rond te krijgen is ("vol"), of dat er nog maar precies
-  // genoeg mensen over zijn en één extra vrije dag het al onmogelijk maakt ("krap").
-  // Zo ziet de baas in één oogopslag welke dagen geen ruimte meer hebben voor verlof.
-  function computeDagCapaciteit(day) {
-    const dayReqs = requirements[day.key] || {};
-    let benodigd = 0;
-    TASKS.forEach((task) => {
-      getCellGroups(dayReqs, task.key).forEach((group) => (benodigd += group.count));
-    });
-
-    const inzetbaar = employees.filter(
-      (e) => e.dagen[day.key] && TASKS.some((t) => employeeCanDoTask(e, t.key) && getCellGroups(dayReqs, t.key).length > 0)
-    );
-    const vrijCount = inzetbaar.filter((e) => hasFullDayVerlof(e, day.dateIso)).length;
-    const beschikbaar = inzetbaar.length - vrijCount;
-
-    if (benodigd === 0) return { status: "ok", benodigd, beschikbaar };
-    if (beschikbaar < benodigd) return { status: "vol", benodigd, beschikbaar };
-    if (beschikbaar === benodigd) return { status: "krap", benodigd, beschikbaar };
-    return { status: "ok", benodigd, beschikbaar };
-  }
-
-  function capaciteitBadgeHtml(cap) {
-    if (cap.status === "vol") {
-      return `<span class="capaciteit-badge capaciteit-vol" title="Er zijn nog maar ${cap.beschikbaar} van de ${cap.benodigd} benodigde mensen inzetbaar. Extra verlof kan hier niet meer bij.">VOL — geen verlof meer mogelijk</span>`;
-    }
-    if (cap.status === "krap") {
-      return `<span class="capaciteit-badge capaciteit-krap" title="Precies genoeg mensen inzetbaar (${cap.beschikbaar} van ${cap.benodigd} nodig). Nog één extra verlofaanvraag maakt deze dag onmogelijk te bezetten.">Krap — bijna vol</span>`;
-    }
-    if (cap.benodigd === 0) return "";
-    return `<span class="capaciteit-badge capaciteit-ok">${cap.beschikbaar} / ${cap.benodigd} inzetbaar</span>`;
-  }
-
-  function renderVerlofOverview() {
-    const weekValue = verlofWeekPicker.value || isoWeekStringFor(new Date());
-    const weekDates = computeWeekDates(weekValue);
-    const table = document.getElementById("verlof-overview-table");
-    const emptyMsg = document.getElementById("verlof-overview-empty");
-
-    const rows = weekDates.map((day) => ({
-      day,
-      namen: employees
-        .filter((e) => verlofEntryFor(e, day.dateIso))
-        .map((e) => `${e.naam} (${verlofEntryLabel(verlofEntryFor(e, day.dateIso))})`)
-        .sort(),
-      cap: computeDagCapaciteit(day),
-    }));
-
-    emptyMsg.hidden = rows.some((r) => r.namen.length > 0);
-
-    let html = "<thead><tr><th>Dag</th><th>Wie heeft vrij gevraagd</th><th>Capaciteit</th></tr></thead><tbody>";
-    rows.forEach(({ day, namen, cap }) => {
-      const rowClass = cap.status === "vol" ? "dag-vol" : cap.status === "krap" ? "dag-krap" : "";
-      html += `<tr class="${rowClass}"><td>${day.label}<br><small>${day.dateIso}</small></td><td>${
-        namen.length ? namen.map((n) => `<span class="tag">${n}</span>`).join("") : "—"
-      }</td><td>${capaciteitBadgeHtml(cap)}</td></tr>`;
-    });
-    html += "</tbody>";
-    table.innerHTML = html;
-  }
-
-  verlofWeekPicker.addEventListener("change", () => {
-    renderVerlofOverview();
-    renderAanvraagOverview();
-  });
-
-  function renderAanvraagOverview() {
-    const weekValue = verlofWeekPicker.value || isoWeekStringFor(new Date());
-    const weekDates = computeWeekDates(weekValue);
-    const table = document.getElementById("aanvraag-overview-table");
-    const emptyMsg = document.getElementById("aanvraag-overview-empty");
-    const scheduleData = loadSchedule(weekValue);
-
-    const rows = [];
-    weekDates.forEach((day) => {
-      employees.forEach((e) => {
-        (e.dienstAanvragen || []).forEach((a) => {
-          if (a.datum !== day.dateIso) return;
-          let status = "Nog geen rooster gegenereerd voor deze week";
-          let statusClass = "";
-          if (scheduleData) {
-            const daySchedule = scheduleData.schedule[day.key] || {};
-            const toegewezen = Object.keys(daySchedule).some(
-              (key) => baseTaskKey(key) === a.taak && (daySchedule[key] || []).includes(e.id)
-            );
-            status = toegewezen ? "✅ toegewezen" : "❌ niet toegewezen";
-            statusClass = toegewezen ? "saldo-overschot" : "saldo-tekort";
-          }
-          rows.push({ day, naam: e.naam, taak: a.taak, status, statusClass });
-        });
-      });
-    });
-
-    emptyMsg.hidden = rows.length > 0;
-
-    let html = "<thead><tr><th>Dag</th><th>Naam</th><th>Taak</th><th>Status</th></tr></thead><tbody>";
-    rows
-      .sort((a, b) => a.day.dateIso.localeCompare(b.day.dateIso) || a.naam.localeCompare(b.naam))
-      .forEach((r) => {
-        html += `<tr><td>${r.day.label}<br><small>${r.day.dateIso}</small></td><td>${r.naam}</td><td>${taskLabel(
-          r.taak
-        )}</td><td class="${r.statusClass}">${r.status}</td></tr>`;
-      });
-    html += "</tbody>";
-    table.innerHTML = html;
-  }
-
-  // ---------- Init ----------
-
-  renderEmployeeTable();
-  renderRequirementsTable();
-  renderOpenSluitTable();
-  renderForbiddenTaskSelect();
-  renderForbiddenPairsList();
-  renderVerlofList();
-  renderAanvraagList();
-  renderVerlofOverview();
-  renderAanvraagOverview();
-  tryLoadExistingSchedule();
+  }, 60000);
 })();
 </script>
 </body>
