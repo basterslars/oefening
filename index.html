@@ -621,9 +621,86 @@ th { color: var(--muted); font-weight: 600; }
 #open-sluit-table td, #open-sluit-table th {
   vertical-align: top;
 }
+
+#app-loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  z-index: 1000;
+  font-size: 1rem;
+  text-align: center;
+  padding: 1.5rem;
+}
+
+#app-loading-overlay .spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: app-spin 0.8s linear infinite;
+}
+
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
+}
+
+#app-loading-overlay .error-box {
+  max-width: 420px;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+#app-loading-overlay button {
+  margin-top: 0.3rem;
+}
+
+#save-error-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-bottom: 1px solid var(--danger);
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+#save-error-banner button {
+  background: none;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: 6px;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+}
 </style>
+<script src="supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
+<div id="app-loading-overlay">
+  <div class="spinner"></div>
+  <div>Gegevens laden vanuit database…</div>
+  <div class="error-box" id="app-loading-error" hidden></div>
+  <button type="button" id="app-loading-retry-btn" hidden class="btn-primary">Opnieuw proberen</button>
+</div>
+<div id="save-error-banner" hidden>
+  <span id="save-error-banner-text"></span>
+  <button type="button" id="save-error-banner-close">Sluiten</button>
+</div>
 <header class="topbar">
   <h1>🍟 Werkrooster <span class="brand-secondary">Kwalitaria Harte Vier</span></h1>
   <nav class="tabs">
@@ -946,6 +1023,26 @@ th { color: var(--muted); font-weight: 600; }
 (function () {
   "use strict";
 
+  // ---------- Supabase ----------
+
+  // Defensief: als het CDN-script of supabase-config.js niet geladen kon worden, mag dat de
+  // hele app niet meteen laten crashen — bootstrapApp() hieronder vangt dit netjes op en
+  // toont een duidelijke foutmelding in het laadscherm in plaats van een lege pagina.
+  const supabaseClient =
+    window.supabase && window.SUPABASE_CONFIG
+      ? window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey)
+      : null;
+
+  function showSaveError(message) {
+    const banner = document.getElementById("save-error-banner");
+    const text = document.getElementById("save-error-banner-text");
+    text.textContent = message;
+    banner.hidden = false;
+  }
+  document.getElementById("save-error-banner-close").addEventListener("click", () => {
+    document.getElementById("save-error-banner").hidden = true;
+  });
+
   // ---------- Static config ----------
 
   const TASKS = [
@@ -1035,15 +1132,6 @@ th { color: var(--muted); font-weight: 600; }
     },
   };
   const DEFAULT_SLUITINGSTIJD = "21:00";
-
-  const STORAGE_KEYS = {
-    employees: "friettent_employees",
-    requirements: "friettent_requirements",
-    schedulePrefix: "friettent_schedule_",
-    openSluit: "friettent_open_sluit",
-    sluitingstijd: "friettent_sluitingstijd",
-    forbiddenPairs: "friettent_forbidden_pairs",
-  };
 
   const MIN_SHIFTS_PER_WEEK = 2;
   const WEKEN_PER_MAAND = 52 / 12;
@@ -1175,18 +1263,6 @@ th { color: var(--muted); font-weight: 600; }
     return Object.keys(emp.dagen).filter((d) => emp.dagen[d].type === "beschikbaar");
   }
 
-  function loadEmployees() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.employees);
-      const list = raw ? JSON.parse(raw) : [];
-      return list.map(normalizeEmployee);
-    } catch (e) {
-      return [];
-    }
-  }
-  function saveEmployees(list) {
-    localStorage.setItem(STORAGE_KEYS.employees, JSON.stringify(list));
-  }
   // Migratie: eerder opgeslagen bezetting kan nog een "bakplaat"-aantal bevatten van vóór de
   // opsplitsing in hoofdplaat/assistentplaat. 1 persoon wordt hoofdplaat; elke extra wordt assistent.
   function splitBakplaatCount(count) {
@@ -1216,93 +1292,235 @@ th { color: var(--muted); font-weight: 600; }
     });
     return next;
   }
-  function loadRequirements() {
+
+  // ---------- Supabase row <-> app-object mapping ----------
+
+  function employeeRowToObj(row) {
+    return {
+      id: row.id,
+      naam: row.naam,
+      taken: row.taken || [],
+      takenUitzonderingen: row.taken_uitzonderingen || {},
+      secundaireTaken: row.secundaire_taken || [],
+      magOpenTotSluit: !!row.mag_open_tot_sluit,
+      heeftSleutel: !!row.heeft_sleutel,
+      nooitAlleenBij: row.nooit_alleen_bij || null,
+      dagen: row.dagen || {},
+      contract: row.contract || { vast: false, uren: 0, periode: "week" },
+      verlof: row.verlof || [],
+      dienstAanvragen: row.dienst_aanvragen || [],
+    };
+  }
+  function employeeObjToRow(emp) {
+    return {
+      id: emp.id,
+      naam: emp.naam,
+      taken: emp.taken,
+      taken_uitzonderingen: emp.takenUitzonderingen,
+      secundaire_taken: emp.secundaireTaken,
+      mag_open_tot_sluit: emp.magOpenTotSluit,
+      heeft_sleutel: emp.heeftSleutel,
+      nooit_alleen_bij: emp.nooitAlleenBij,
+      dagen: emp.dagen,
+      contract: emp.contract,
+      verlof: emp.verlof,
+      dienst_aanvragen: emp.dienstAanvragen,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  // ---------- Storage helpers (Supabase-backed) ----------
+  //
+  // De rest van de app leest/schrijft employees/requirements/openSluit/sluitingstijd/
+  // forbiddenPairs/scheduleStore als gewone in-memory variabelen (net als voorheen met
+  // localStorage). load*() haalt bij het opstarten éénmalig alles op uit Supabase; save*()
+  // stuurt de wijziging naar Supabase (niet afgewacht door de aanroeper, net zoals
+  // localStorage.setItem altijd synchroon "klaar" leek) en meldt een fout via de
+  // save-error-banner als het schrijven mislukt (bijv. geen internetverbinding).
+
+  async function loadEmployees() {
+    const { data, error } = await supabaseClient.from("employees").select("*").order("naam");
+    if (error) throw error;
+    return (data || []).map(employeeRowToObj).map(normalizeEmployee);
+  }
+  async function saveEmployees(list) {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.requirements);
-      const parsed = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
-      return migrateBakplaatInRequirements(parsed);
-    } catch (e) {
-      return JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
+      const { data: existingRows, error: selError } = await supabaseClient.from("employees").select("id");
+      if (selError) throw selError;
+      const keepIds = new Set(list.map((e) => e.id));
+      const toDelete = (existingRows || []).map((r) => r.id).filter((id) => !keepIds.has(id));
+      if (toDelete.length) {
+        const { error: delError } = await supabaseClient.from("employees").delete().in("id", toDelete);
+        if (delError) throw delError;
+      }
+      if (list.length) {
+        const { error: upsertError } = await supabaseClient.from("employees").upsert(list.map(employeeObjToRow));
+        if (upsertError) throw upsertError;
+      }
+    } catch (err) {
+      console.error("Kon medewerkers niet opslaan in Supabase:", err);
+      showSaveError("Medewerkers opslaan is mislukt: " + (err.message || err));
     }
   }
-  function saveRequirements(reqs) {
-    localStorage.setItem(STORAGE_KEYS.requirements, JSON.stringify(reqs));
+
+  async function loadRequirements() {
+    const { data, error } = await supabaseClient.from("requirements").select("day_key, data");
+    if (error) throw error;
+    const parsed = {};
+    (data || []).forEach((row) => (parsed[row.day_key] = row.data));
+    DAYS.forEach((d) => {
+      if (!parsed[d.key]) parsed[d.key] = JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS[d.key]));
+    });
+    return migrateBakplaatInRequirements(parsed);
+  }
+  async function saveRequirements(reqs) {
+    try {
+      const rows = DAYS.map((d) => ({ day_key: d.key, data: reqs[d.key] || {}, updated_at: new Date().toISOString() }));
+      const { error } = await supabaseClient.from("requirements").upsert(rows);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Kon bezetting niet opslaan in Supabase:", err);
+      showSaveError("Bezetting opslaan is mislukt: " + (err.message || err));
+    }
+  }
+
+  let scheduleStore = {}; // weekValue -> { schedule, requirementsSnapshot, tijdslotOverrides }
+  async function loadAllSchedules() {
+    const { data, error } = await supabaseClient
+      .from("schedules")
+      .select("week_value, schedule, requirements_snapshot, tijdslot_overrides");
+    if (error) throw error;
+    const store = {};
+    (data || []).forEach((row) => {
+      store[row.week_value] = {
+        schedule: row.schedule || {},
+        requirementsSnapshot: row.requirements_snapshot || {},
+        tijdslotOverrides: row.tijdslot_overrides || {},
+      };
+    });
+    return store;
   }
   function loadSchedule(weekValue) {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.schedulePrefix + weekValue);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
+    return scheduleStore[weekValue] || null;
   }
   function saveSchedule(weekValue, data) {
-    localStorage.setItem(STORAGE_KEYS.schedulePrefix + weekValue, JSON.stringify(data));
-  }
-  function loadOpenSluit() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.openSluit);
-      const parsed = raw ? JSON.parse(raw) : {};
-      const result = {};
-      DAYS.forEach((d) => {
-        const entry = parsed[d.key] || {};
-        const fallback = DEFAULT_OPEN_SLUIT[d.key];
-        result[d.key] = {
-          tijdsloten: Array.isArray(entry.tijdsloten) ? entry.tijdsloten : fallback.tijdsloten.slice(),
-          openers: Array.isArray(entry.openers) ? entry.openers : fallback.openers.slice(),
-          sluiters: typeof entry.sluiters === "number" ? entry.sluiters : fallback.sluiters,
+    scheduleStore[weekValue] = data;
+    (async () => {
+      try {
+        const row = {
+          week_value: weekValue,
+          schedule: data.schedule,
+          requirements_snapshot: data.requirementsSnapshot,
+          tijdslot_overrides: data.tijdslotOverrides || {},
+          updated_at: new Date().toISOString(),
         };
-      });
-      return result;
-    } catch (e) {
-      return JSON.parse(JSON.stringify(DEFAULT_OPEN_SLUIT));
-    }
-  }
-  function saveOpenSluit(data) {
-    localStorage.setItem(STORAGE_KEYS.openSluit, JSON.stringify(data));
-  }
-  function loadSluitingstijd() {
-    return localStorage.getItem(STORAGE_KEYS.sluitingstijd) || DEFAULT_SLUITINGSTIJD;
-  }
-  function saveSluitingstijd(val) {
-    localStorage.setItem(STORAGE_KEYS.sluitingstijd, val);
-  }
-  function loadForbiddenPairs() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.forbiddenPairs);
-      const parsed = raw ? JSON.parse(raw) : {};
-      const migrated = {};
-      Object.entries(parsed).forEach(([taskKeyRaw, pairs]) => {
-        const taskKey = migrateTaskKey(taskKeyRaw);
-        migrated[taskKey] = (migrated[taskKey] || []).concat(pairs);
-      });
-      return migrated;
-    } catch (e) {
-      return {};
-    }
-  }
-  function saveForbiddenPairs(data) {
-    localStorage.setItem(STORAGE_KEYS.forbiddenPairs, JSON.stringify(data));
-  }
-  function listStoredWeeksBefore(weekValue) {
-    const weeks = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.indexOf(STORAGE_KEYS.schedulePrefix) === 0) {
-        const w = key.slice(STORAGE_KEYS.schedulePrefix.length);
-        if (w < weekValue) weeks.push(w);
+        const { error } = await supabaseClient.from("schedules").upsert(row);
+        if (error) throw error;
+      } catch (err) {
+        console.error("Kon rooster niet opslaan in Supabase:", err);
+        showSaveError("Rooster opslaan is mislukt: " + (err.message || err));
       }
+    })();
+  }
+
+  async function loadOpenSluit() {
+    const { data, error } = await supabaseClient.from("open_sluit").select("day_key, tijdsloten, openers, sluiters");
+    if (error) throw error;
+    const parsed = {};
+    (data || []).forEach((row) => (parsed[row.day_key] = row));
+    const result = {};
+    DAYS.forEach((d) => {
+      const entry = parsed[d.key] || {};
+      const fallback = DEFAULT_OPEN_SLUIT[d.key];
+      result[d.key] = {
+        tijdsloten: Array.isArray(entry.tijdsloten) ? entry.tijdsloten : fallback.tijdsloten.slice(),
+        openers: Array.isArray(entry.openers) ? entry.openers : fallback.openers.slice(),
+        sluiters: typeof entry.sluiters === "number" ? entry.sluiters : fallback.sluiters,
+      };
+    });
+    return result;
+  }
+  async function saveOpenSluit(data) {
+    try {
+      const rows = DAYS.map((d) => ({
+        day_key: d.key,
+        tijdsloten: (data[d.key] && data[d.key].tijdsloten) || [],
+        openers: (data[d.key] && data[d.key].openers) || [],
+        sluiters: (data[d.key] && data[d.key].sluiters) || 0,
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await supabaseClient.from("open_sluit").upsert(rows);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Kon openen & sluiten niet opslaan in Supabase:", err);
+      showSaveError("Openen & sluiten opslaan is mislukt: " + (err.message || err));
     }
-    return weeks.sort();
+  }
+
+  async function loadSluitingstijd() {
+    const { data, error } = await supabaseClient.from("app_settings").select("value").eq("key", "sluitingstijd").maybeSingle();
+    if (error) throw error;
+    return (data && data.value) || DEFAULT_SLUITINGSTIJD;
+  }
+  async function saveSluitingstijd(val) {
+    try {
+      const { error } = await supabaseClient
+        .from("app_settings")
+        .upsert({ key: "sluitingstijd", value: val, updated_at: new Date().toISOString() });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Kon sluitingstijd niet opslaan in Supabase:", err);
+      showSaveError("Sluitingstijd opslaan is mislukt: " + (err.message || err));
+    }
+  }
+
+  async function loadForbiddenPairs() {
+    const { data, error } = await supabaseClient.from("forbidden_pairs").select("task, employee_id_1, employee_id_2");
+    if (error) throw error;
+    const migrated = {};
+    (data || []).forEach((row) => {
+      const taskKey = migrateTaskKey(row.task);
+      migrated[taskKey] = migrated[taskKey] || [];
+      migrated[taskKey].push([row.employee_id_1, row.employee_id_2]);
+    });
+    return migrated;
+  }
+  async function saveForbiddenPairs(data) {
+    try {
+      const rows = [];
+      Object.entries(data).forEach(([task, pairs]) => {
+        (pairs || []).forEach(([a, b]) => rows.push({ task, employee_id_1: a, employee_id_2: b }));
+      });
+      const { error: delError } = await supabaseClient.from("forbidden_pairs").delete().not("id", "is", null);
+      if (delError) throw delError;
+      if (rows.length) {
+        const { error: insError } = await supabaseClient.from("forbidden_pairs").insert(rows);
+        if (insError) throw insError;
+      }
+    } catch (err) {
+      console.error("Kon verboden koppels niet opslaan in Supabase:", err);
+      showSaveError("Verboden koppels opslaan is mislukt: " + (err.message || err));
+    }
+  }
+
+  function listStoredWeeksBefore(weekValue) {
+    return Object.keys(scheduleStore)
+      .filter((w) => w < weekValue)
+      .sort();
   }
 
   // ---------- App state ----------
+  //
+  // Deze module-variabelen starten met veilige standaardwaarden zodat de synchrone
+  // formulieropbouw hieronder (buildTakenRows/buildDagenRows enz.) meteen kan draaien.
+  // De echte data wordt hierna asynchroon uit Supabase geladen door bootstrapApp() (zie
+  // "Init" onderaan), die deze variabelen vervangt en de UI opnieuw rendert.
 
-  let employees = loadEmployees();
-  let requirements = loadRequirements();
-  let openSluit = loadOpenSluit();
-  let sluitingstijd = loadSluitingstijd();
-  let forbiddenPairs = loadForbiddenPairs();
+  let employees = [];
+  let requirements = JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
+  let openSluit = JSON.parse(JSON.stringify(DEFAULT_OPEN_SLUIT));
+  let sluitingstijd = DEFAULT_SLUITINGSTIJD;
+  let forbiddenPairs = {};
   let editingEmployeeId = null;
   let employeeFormVerlof = [];
   let currentWeekValue = null;
@@ -2150,28 +2368,30 @@ th { color: var(--muted); font-weight: 600; }
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const data = JSON.parse(reader.result);
+        // Volgorde is belangrijk: forbidden_pairs verwijst naar employees, dus die moeten
+        // eerst (en afgewacht) opgeslagen zijn voor verboden koppels naar Supabase gaan.
         if (Array.isArray(data.employees)) {
           employees = data.employees.map(normalizeEmployee);
-          saveEmployees(employees);
+          await saveEmployees(employees);
         }
         if (data.requirements) {
           requirements = data.requirements;
-          saveRequirements(requirements);
+          await saveRequirements(requirements);
         }
         if (data.openSluit) {
           openSluit = data.openSluit;
-          saveOpenSluit(openSluit);
+          await saveOpenSluit(openSluit);
         }
         if (data.sluitingstijd) {
           sluitingstijd = data.sluitingstijd;
-          saveSluitingstijd(sluitingstijd);
+          await saveSluitingstijd(sluitingstijd);
         }
         if (data.forbiddenPairs) {
           forbiddenPairs = data.forbiddenPairs;
-          saveForbiddenPairs(forbiddenPairs);
+          await saveForbiddenPairs(forbiddenPairs);
         }
         buildDagenRows(vasteDagenContainer, DAYS, "vast");
         buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
@@ -3190,16 +3410,71 @@ th { color: var(--muted); font-weight: 600; }
 
   // ---------- Init ----------
 
-  renderEmployeeTable();
-  renderRequirementsTable();
-  renderOpenSluitTable();
-  renderForbiddenTaskSelect();
-  renderForbiddenPairsList();
-  renderVerlofList();
-  renderAanvraagList();
-  renderVerlofOverview();
-  renderAanvraagOverview();
-  tryLoadExistingSchedule();
+  // Haalt bij het opstarten (en bij "Opnieuw proberen") eenmalig alle data uit Supabase op,
+  // vervangt daarmee de tijdelijke standaardwaarden waarmee het formulier hierboven al
+  // synchroon is opgebouwd, en rendert dan de rest van de app — pas dan verdwijnt het
+  // laadscherm. Als het ophalen mislukt (bijv. geen internet) blijft het laadscherm staan
+  // met een foutmelding en een knop om het opnieuw te proberen, zodat er nooit stilletjes
+  // met lege/verouderde data verder gewerkt wordt.
+  async function bootstrapApp() {
+    const overlay = document.getElementById("app-loading-overlay");
+    const errorBox = document.getElementById("app-loading-error");
+    const retryBtn = document.getElementById("app-loading-retry-btn");
+    overlay.hidden = false;
+    errorBox.hidden = true;
+    retryBtn.hidden = true;
+    try {
+      if (!supabaseClient) {
+        throw new Error(
+          "De Supabase-client kon niet worden geladen (CDN-script of supabase-config.js ontbreekt of kon niet laden)."
+        );
+      }
+      const [emps, reqs, openSluitData, sluitTijd, pairs, schedules] = await Promise.all([
+        loadEmployees(),
+        loadRequirements(),
+        loadOpenSluit(),
+        loadSluitingstijd(),
+        loadForbiddenPairs(),
+        loadAllSchedules(),
+      ]);
+      employees = emps;
+      requirements = reqs;
+      openSluit = openSluitData;
+      sluitingstijd = sluitTijd;
+      forbiddenPairs = pairs;
+      scheduleStore = schedules;
+
+      // Deze tijdopties-checkboxen zijn tijdens het scriptparsen al eenmaal opgebouwd met de
+      // tijdelijke standaardwaarden voor openSluit — nu herbouwen met de echte data.
+      buildDagenRows(vasteDagenContainer, DAYS, "vast");
+      buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
+
+      renderEmployeeTable();
+      renderRequirementsTable();
+      renderOpenSluitTable();
+      renderForbiddenTaskSelect();
+      renderForbiddenPairsList();
+      renderVerlofList();
+      renderAanvraagList();
+      renderVerlofOverview();
+      renderAanvraagOverview();
+      tryLoadExistingSchedule();
+
+      overlay.hidden = true;
+    } catch (err) {
+      console.error("Kon gegevens niet laden uit Supabase:", err);
+      errorBox.textContent =
+        "Kon gegevens niet laden: " +
+        (err.message || err) +
+        ". Controleer de internetverbinding en de sleutels in supabase-config.js.";
+      errorBox.hidden = false;
+      retryBtn.hidden = false;
+    }
+  }
+
+  document.getElementById("app-loading-retry-btn").addEventListener("click", bootstrapApp);
+
+  bootstrapApp();
 })();
 </script>
 </body>
