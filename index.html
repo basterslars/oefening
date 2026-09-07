@@ -692,8 +692,8 @@ th { color: var(--muted); font-weight: 600; }
 </head>
 <body>
 <div id="app-loading-overlay">
-  <div class="spinner"></div>
-  <div>Gegevens laden vanuit database…</div>
+  <div class="spinner" id="app-loading-spinner"></div>
+  <div id="app-loading-text">Gegevens laden vanuit database…</div>
   <div class="error-box" id="app-loading-error" hidden></div>
   <button type="button" id="app-loading-retry-btn" hidden class="btn-primary">Opnieuw proberen</button>
 </div>
@@ -3473,9 +3473,13 @@ th { color: var(--muted); font-weight: 600; }
 
   async function bootstrapApp() {
     const overlay = document.getElementById("app-loading-overlay");
+    const spinner = document.getElementById("app-loading-spinner");
+    const loadingText = document.getElementById("app-loading-text");
     const errorBox = document.getElementById("app-loading-error");
     const retryBtn = document.getElementById("app-loading-retry-btn");
     overlay.hidden = false;
+    spinner.hidden = false;
+    loadingText.hidden = false;
     errorBox.hidden = true;
     retryBtn.hidden = true;
     try {
@@ -3522,6 +3526,8 @@ th { color: var(--muted); font-weight: 600; }
       overlay.hidden = true;
     } catch (err) {
       console.error("Kon gegevens niet laden uit Supabase:", err);
+      spinner.hidden = true;
+      loadingText.hidden = true;
       errorBox.textContent =
         "Kon gegevens niet laden: " +
         (err.message || err) +
