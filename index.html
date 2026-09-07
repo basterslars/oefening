@@ -1345,18 +1345,24 @@ th { color: var(--muted); font-weight: 600; }
   }
   async function saveEmployees(list) {
     try {
-      const { data: existingRows, error: selError } = await supabaseClient.from("employees").select("id");
-      if (selError) throw selError;
-      const keepIds = new Set(list.map((e) => e.id));
-      const toDelete = (existingRows || []).map((r) => r.id).filter((id) => !keepIds.has(id));
-      if (toDelete.length) {
-        const { error: delError } = await supabaseClient.from("employees").delete().in("id", toDelete);
-        if (delError) throw delError;
-      }
-      if (list.length) {
-        const { error: upsertError } = await supabaseClient.from("employees").upsert(list.map(employeeObjToRow));
-        if (upsertError) throw upsertError;
-      }
+      await withTimeout(
+        (async () => {
+          const { data: existingRows, error: selError } = await supabaseClient.from("employees").select("id");
+          if (selError) throw selError;
+          const keepIds = new Set(list.map((e) => e.id));
+          const toDelete = (existingRows || []).map((r) => r.id).filter((id) => !keepIds.has(id));
+          if (toDelete.length) {
+            const { error: delError } = await supabaseClient.from("employees").delete().in("id", toDelete);
+            if (delError) throw delError;
+          }
+          if (list.length) {
+            const { error: upsertError } = await supabaseClient.from("employees").upsert(list.map(employeeObjToRow));
+            if (upsertError) throw upsertError;
+          }
+        })(),
+        15000,
+        "medewerkers opslaan"
+      );
     } catch (err) {
       console.error("Kon medewerkers niet opslaan in Supabase:", err);
       showSaveError("Medewerkers opslaan is mislukt: " + (err.message || err));
@@ -1375,9 +1381,15 @@ th { color: var(--muted); font-weight: 600; }
   }
   async function saveRequirements(reqs) {
     try {
-      const rows = DAYS.map((d) => ({ day_key: d.key, data: reqs[d.key] || {}, updated_at: new Date().toISOString() }));
-      const { error } = await supabaseClient.from("requirements").upsert(rows);
-      if (error) throw error;
+      await withTimeout(
+        (async () => {
+          const rows = DAYS.map((d) => ({ day_key: d.key, data: reqs[d.key] || {}, updated_at: new Date().toISOString() }));
+          const { error } = await supabaseClient.from("requirements").upsert(rows);
+          if (error) throw error;
+        })(),
+        15000,
+        "bezetting opslaan"
+      );
     } catch (err) {
       console.error("Kon bezetting niet opslaan in Supabase:", err);
       showSaveError("Bezetting opslaan is mislukt: " + (err.message || err));
@@ -1407,15 +1419,21 @@ th { color: var(--muted); font-weight: 600; }
     scheduleStore[weekValue] = data;
     (async () => {
       try {
-        const row = {
-          week_value: weekValue,
-          schedule: data.schedule,
-          requirements_snapshot: data.requirementsSnapshot,
-          tijdslot_overrides: data.tijdslotOverrides || {},
-          updated_at: new Date().toISOString(),
-        };
-        const { error } = await supabaseClient.from("schedules").upsert(row);
-        if (error) throw error;
+        await withTimeout(
+          (async () => {
+            const row = {
+              week_value: weekValue,
+              schedule: data.schedule,
+              requirements_snapshot: data.requirementsSnapshot,
+              tijdslot_overrides: data.tijdslotOverrides || {},
+              updated_at: new Date().toISOString(),
+            };
+            const { error } = await supabaseClient.from("schedules").upsert(row);
+            if (error) throw error;
+          })(),
+          15000,
+          "rooster opslaan"
+        );
       } catch (err) {
         console.error("Kon rooster niet opslaan in Supabase:", err);
         showSaveError("Rooster opslaan is mislukt: " + (err.message || err));
@@ -1442,15 +1460,21 @@ th { color: var(--muted); font-weight: 600; }
   }
   async function saveOpenSluit(data) {
     try {
-      const rows = DAYS.map((d) => ({
-        day_key: d.key,
-        tijdsloten: (data[d.key] && data[d.key].tijdsloten) || [],
-        openers: (data[d.key] && data[d.key].openers) || [],
-        sluiters: (data[d.key] && data[d.key].sluiters) || 0,
-        updated_at: new Date().toISOString(),
-      }));
-      const { error } = await supabaseClient.from("open_sluit").upsert(rows);
-      if (error) throw error;
+      await withTimeout(
+        (async () => {
+          const rows = DAYS.map((d) => ({
+            day_key: d.key,
+            tijdsloten: (data[d.key] && data[d.key].tijdsloten) || [],
+            openers: (data[d.key] && data[d.key].openers) || [],
+            sluiters: (data[d.key] && data[d.key].sluiters) || 0,
+            updated_at: new Date().toISOString(),
+          }));
+          const { error } = await supabaseClient.from("open_sluit").upsert(rows);
+          if (error) throw error;
+        })(),
+        15000,
+        "openen & sluiten opslaan"
+      );
     } catch (err) {
       console.error("Kon openen & sluiten niet opslaan in Supabase:", err);
       showSaveError("Openen & sluiten opslaan is mislukt: " + (err.message || err));
@@ -1464,10 +1488,16 @@ th { color: var(--muted); font-weight: 600; }
   }
   async function saveSluitingstijd(val) {
     try {
-      const { error } = await supabaseClient
-        .from("app_settings")
-        .upsert({ key: "sluitingstijd", value: val, updated_at: new Date().toISOString() });
-      if (error) throw error;
+      await withTimeout(
+        (async () => {
+          const { error } = await supabaseClient
+            .from("app_settings")
+            .upsert({ key: "sluitingstijd", value: val, updated_at: new Date().toISOString() });
+          if (error) throw error;
+        })(),
+        15000,
+        "sluitingstijd opslaan"
+      );
     } catch (err) {
       console.error("Kon sluitingstijd niet opslaan in Supabase:", err);
       showSaveError("Sluitingstijd opslaan is mislukt: " + (err.message || err));
@@ -1487,16 +1517,22 @@ th { color: var(--muted); font-weight: 600; }
   }
   async function saveForbiddenPairs(data) {
     try {
-      const rows = [];
-      Object.entries(data).forEach(([task, pairs]) => {
-        (pairs || []).forEach(([a, b]) => rows.push({ task, employee_id_1: a, employee_id_2: b }));
-      });
-      const { error: delError } = await supabaseClient.from("forbidden_pairs").delete().not("id", "is", null);
-      if (delError) throw delError;
-      if (rows.length) {
-        const { error: insError } = await supabaseClient.from("forbidden_pairs").insert(rows);
-        if (insError) throw insError;
-      }
+      await withTimeout(
+        (async () => {
+          const rows = [];
+          Object.entries(data).forEach(([task, pairs]) => {
+            (pairs || []).forEach(([a, b]) => rows.push({ task, employee_id_1: a, employee_id_2: b }));
+          });
+          const { error: delError } = await supabaseClient.from("forbidden_pairs").delete().not("id", "is", null);
+          if (delError) throw delError;
+          if (rows.length) {
+            const { error: insError } = await supabaseClient.from("forbidden_pairs").insert(rows);
+            if (insError) throw insError;
+          }
+        })(),
+        15000,
+        "verboden koppels opslaan"
+      );
     } catch (err) {
       console.error("Kon verboden koppels niet opslaan in Supabase:", err);
       showSaveError("Verboden koppels opslaan is mislukt: " + (err.message || err));
@@ -3416,6 +3452,25 @@ th { color: var(--muted); font-weight: 600; }
   // laadscherm. Als het ophalen mislukt (bijv. geen internet) blijft het laadscherm staan
   // met een foutmelding en een knop om het opnieuw te proberen, zodat er nooit stilletjes
   // met lege/verouderde data verder gewerkt wordt.
+  // Voorkomt dat het laadscherm eindeloos blijft draaien als een netwerkverzoek naar Supabase
+  // (bijv. door een firewall, VPN of privacy-extensie) blijft hangen zonder ooit een fout terug
+  // te geven — na de timeout krijgt de gebruiker altijd een duidelijke melding te zien.
+  function withTimeout(promise, ms, label) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `Geen reactie van Supabase binnen ${ms / 1000} seconden (${label}). Mogelijk blokkeert een firewall, VPN of privacy-extensie het domein *.supabase.co.`
+            )
+          ),
+        ms
+      );
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  }
+
   async function bootstrapApp() {
     const overlay = document.getElementById("app-loading-overlay");
     const errorBox = document.getElementById("app-loading-error");
@@ -3429,14 +3484,18 @@ th { color: var(--muted); font-weight: 600; }
           "De Supabase-client kon niet worden geladen (CDN-script of supabase-config.js ontbreekt of kon niet laden)."
         );
       }
-      const [emps, reqs, openSluitData, sluitTijd, pairs, schedules] = await Promise.all([
-        loadEmployees(),
-        loadRequirements(),
-        loadOpenSluit(),
-        loadSluitingstijd(),
-        loadForbiddenPairs(),
-        loadAllSchedules(),
-      ]);
+      const [emps, reqs, openSluitData, sluitTijd, pairs, schedules] = await withTimeout(
+        Promise.all([
+          loadEmployees(),
+          loadRequirements(),
+          loadOpenSluit(),
+          loadSluitingstijd(),
+          loadForbiddenPairs(),
+          loadAllSchedules(),
+        ]),
+        15000,
+        "gegevens ophalen"
+      );
       employees = emps;
       requirements = reqs;
       openSluit = openSluitData;
