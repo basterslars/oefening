@@ -43,6 +43,13 @@
 
 * { box-sizing: border-box; }
 
+/* Elements toggled via the "hidden" attribute must actually disappear, even when a more
+   specific rule elsewhere sets an explicit display (e.g. "display: flex") on that same
+   element — an author-origin declaration otherwise beats the browser's own
+   "[hidden] { display: none }" rule regardless of selector specificity, which silently
+   leaves things like #app-loading-overlay stuck visible forever after JS sets .hidden. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
