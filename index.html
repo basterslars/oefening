@@ -626,7 +626,7 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="supabase-config.js"></script>
 <script>
 (function () {
@@ -634,7 +634,32 @@
 
   var STORAGE_THEME = "theme_v1";
 
+  function fatalError(message) {
+    var overlay = document.getElementById("loadingOverlay");
+    if (overlay) overlay.hidden = true;
+    var app = document.getElementById("app");
+    if (app) app.hidden = false;
+    var box = document.getElementById("syncError");
+    if (box) { box.textContent = message; box.hidden = false; }
+  }
+
+  if (!window.supabase || typeof window.supabase.createClient !== "function") {
+    fatalError("Kon de Supabase-bibliotheek niet laden (cdn.jsdelivr.net is niet bereikbaar). Controleer je internetverbinding en herlaad de pagina.");
+    return;
+  }
+  if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+    fatalError("supabase-config.js ontbreekt of is onvolledig geladen. Herlaad de pagina.");
+    return;
+  }
+
   var supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+  function withTimeout(promise, ms, message) {
+    return Promise.race([
+      promise,
+      new Promise(function (_, reject) { setTimeout(function () { reject(new Error(message)); }, ms); })
+    ]);
+  }
 
   var COLORS = [
     { key: "slot-1", var: "--slot-1" },
@@ -1225,8 +1250,8 @@
   // ---------- bootstrap ----------
   async function boot() {
     try {
-      await ensureSession();
-      await fetchHabitsAndChecks();
+      await withTimeout(ensureSession(), 15000, "geen reactie van Supabase binnen 15 seconden");
+      await withTimeout(fetchHabitsAndChecks(), 15000, "geen reactie van Supabase binnen 15 seconden");
       renderAll();
       document.getElementById("loadingOverlay").hidden = true;
       document.getElementById("app").hidden = false;
