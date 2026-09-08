@@ -532,6 +532,42 @@
     padding: 30px 10px;
   }
 
+  /* ---------- Loading / sync errors ---------- */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--page);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+  }
+  .loading-spinner {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sync-error {
+    background: #fdecea;
+    border: 1px solid #e34948;
+    color: #7a1f1f;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 0.88rem;
+    line-height: 1.4;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      .sync-error { background: rgba(227,73,72,0.14); color: #ffb3b2; border-color: #e66767; }
+    }
+  }
+  [data-theme="dark"] .sync-error { background: rgba(227,73,72,0.14); color: #ffb3b2; border-color: #e66767; }
+  .sync-error a { color: inherit; }
+
   @media (max-width: 480px) {
     .hero-top h1 { font-size: 1.15rem; }
     .hero-date-weekday { font-size: 1.25rem; }
@@ -539,7 +575,8 @@
 </style>
 </head>
 <body>
-<div class="app">
+<div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner" aria-label="Bezig met laden"></div></div>
+<div class="app" id="app" hidden>
 
   <header class="hero">
     <div class="hero-top">
@@ -560,6 +597,8 @@
       </div>
     </div>
   </header>
+
+  <div class="sync-error" id="syncError" hidden></div>
 
   <section class="card">
     <h2>Nieuwe gewoonte</h2>
@@ -587,13 +626,15 @@
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script>
 (function () {
   "use strict";
 
-  var STORAGE_HABITS = "habits_v1";
-  var STORAGE_CHECKS = "checks_v1";
   var STORAGE_THEME = "theme_v1";
+
+  var supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 
   var COLORS = [
     { key: "slot-1", var: "--slot-1" },
@@ -626,45 +667,78 @@
     var dow = (d.getDay() + 6) % 7; // Mon=0..Sun=6
     return addDays(d, -dow);
   }
-  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
-
-  // ---------- storage ----------
-  function loadHabits() {
-    try {
-      var raw = localStorage.getItem(STORAGE_HABITS);
-      var list = raw ? JSON.parse(raw) : [];
-      return Array.isArray(list) ? list : [];
-    } catch (e) { return []; }
-  }
-  function saveHabits(list) { localStorage.setItem(STORAGE_HABITS, JSON.stringify(list)); }
-
-  function loadChecks() {
-    try {
-      var raw = localStorage.getItem(STORAGE_CHECKS);
-      var obj = raw ? JSON.parse(raw) : {};
-      return obj && typeof obj === "object" ? obj : {};
-    } catch (e) { return {}; }
-  }
-  function saveChecks(obj) { localStorage.setItem(STORAGE_CHECKS, JSON.stringify(obj)); }
-
-  var habits = loadHabits();
-  var checks = loadChecks(); // { habitId: { "YYYY-MM-DD": true } }
+  // ---------- Supabase-backed data ----------
+  var habits = []; // [{ id, name, color, createdAt }]
+  var checks = {}; // { habitId: { "YYYY-MM-DD": true } }
   var yearOffsets = {}; // habitId -> offset from current year (for prev/next nav)
+  var pendingToggles = {}; // "habitId|iso" -> true while a request is in flight
+
+  function showSyncError(message) {
+    var box = document.getElementById("syncError");
+    box.textContent = message;
+    box.hidden = false;
+  }
+  function clearSyncError() {
+    document.getElementById("syncError").hidden = true;
+  }
+
+  async function ensureSession() {
+    var got = await supabaseClient.auth.getSession();
+    if (got.data.session) return got.data.session;
+    var signIn = await supabaseClient.auth.signInAnonymously();
+    if (signIn.error) throw signIn.error;
+    return signIn.data.session;
+  }
+
+  async function fetchHabitsAndChecks() {
+    var habitsRes = await supabaseClient
+      .from("habits")
+      .select("id,name,color,created_at")
+      .order("created_at", { ascending: true });
+    if (habitsRes.error) throw habitsRes.error;
+    habits = habitsRes.data.map(function (r) {
+      return { id: r.id, name: r.name, color: r.color, createdAt: r.created_at };
+    });
+
+    var checksRes = await supabaseClient.from("habit_checks").select("habit_id,check_date");
+    if (checksRes.error) throw checksRes.error;
+    var map = {};
+    checksRes.data.forEach(function (r) {
+      if (!map[r.habit_id]) map[r.habit_id] = {};
+      map[r.habit_id][r.check_date] = true;
+    });
+    checks = map;
+  }
 
   function isChecked(habitId, iso) {
     return !!(checks[habitId] && checks[habitId][iso]);
   }
-  function setChecked(habitId, iso, val) {
-    if (!checks[habitId]) checks[habitId] = {};
-    if (val) checks[habitId][iso] = true;
-    else delete checks[habitId][iso];
-    saveChecks(checks);
-  }
-  function toggleChecked(habitId, iso) {
+
+  async function toggleChecked(habitId, iso) {
     var future = iso > todayISO();
     if (future) return;
-    setChecked(habitId, iso, !isChecked(habitId, iso));
-    renderAll();
+    var key = habitId + "|" + iso;
+    if (pendingToggles[key]) return;
+    pendingToggles[key] = true;
+    try {
+      var wasChecked = isChecked(habitId, iso);
+      if (wasChecked) {
+        var del = await supabaseClient.from("habit_checks").delete().eq("habit_id", habitId).eq("check_date", iso);
+        if (del.error) throw del.error;
+        if (checks[habitId]) delete checks[habitId][iso];
+      } else {
+        var ins = await supabaseClient.from("habit_checks").insert({ habit_id: habitId, check_date: iso });
+        if (ins.error) throw ins.error;
+        if (!checks[habitId]) checks[habitId] = {};
+        checks[habitId][iso] = true;
+      }
+      clearSyncError();
+      renderAll();
+    } catch (e) {
+      showSyncError("Kon de gewoonte niet bijwerken: " + e.message);
+    } finally {
+      delete pendingToggles[key];
+    }
   }
 
   function colorVar(habit) {
@@ -724,8 +798,9 @@
   function renderHeroDate() {
     var now = new Date();
     document.getElementById("todayWeekday").textContent = WEEKDAYS_LONG[now.getDay()];
-    document.getElementById("todayFull").textContent =
-      now.getDate() + " " + MONTHS_LONG[now.getMonth()] + " " + now.getFullYear();
+    var full = document.getElementById("todayFull");
+    full.textContent = now.getDate() + " " + MONTHS_LONG[now.getMonth()] + " " + now.getFullYear();
+    full.dataset.iso = todayISO();
   }
 
   function renderHeroProgress() {
@@ -804,6 +879,7 @@
       delBtn.title = "Verwijder gewoonte";
       delBtn.addEventListener("click", function () {
         if (delBtn.classList.contains("confirming")) {
+          delBtn.disabled = true;
           deleteHabit(h.id);
         } else {
           delBtn.classList.add("confirming");
@@ -1075,20 +1151,36 @@
     });
   }
 
-  function deleteHabit(id) {
-    habits = habits.filter(function (h) { return h.id !== id; });
-    saveHabits(habits);
-    delete checks[id];
-    saveChecks(checks);
-    delete yearOffsets[id];
-    renderAll();
+  async function deleteHabit(id) {
+    try {
+      var res = await supabaseClient.from("habits").delete().eq("id", id);
+      if (res.error) throw res.error;
+      habits = habits.filter(function (h) { return h.id !== id; });
+      delete checks[id];
+      delete yearOffsets[id];
+      clearSyncError();
+      renderAll();
+    } catch (e) {
+      showSyncError("Kon de gewoonte niet verwijderen: " + e.message);
+      renderAll();
+    }
   }
 
-  function addHabit(name, colorKey) {
-    var habit = { id: uid(), name: name, color: colorKey, createdAt: todayISO() };
-    habits.push(habit);
-    saveHabits(habits);
-    renderAll();
+  async function addHabit(name, colorKey) {
+    var form = document.getElementById("addHabitForm");
+    var submitBtn = form.querySelector(".add-btn");
+    submitBtn.disabled = true;
+    try {
+      var res = await supabaseClient.from("habits").insert({ name: name, color: colorKey }).select().single();
+      if (res.error) throw res.error;
+      habits.push({ id: res.data.id, name: res.data.name, color: res.data.color, createdAt: res.data.created_at });
+      clearSyncError();
+      renderAll();
+    } catch (e) {
+      showSyncError("Kon de gewoonte niet opslaan: " + e.message);
+    } finally {
+      submitBtn.disabled = false;
+    }
   }
 
   function renderAll() {
@@ -1129,7 +1221,25 @@
   });
 
   renderColorPicker();
-  renderAll();
+
+  // ---------- bootstrap ----------
+  async function boot() {
+    try {
+      await ensureSession();
+      await fetchHabitsAndChecks();
+      renderAll();
+      document.getElementById("loadingOverlay").hidden = true;
+      document.getElementById("app").hidden = false;
+    } catch (e) {
+      document.getElementById("loadingOverlay").hidden = true;
+      document.getElementById("app").hidden = false;
+      showSyncError(
+        "Kon niet verbinden met de database: " + e.message +
+        ". Controleer of 'Anonymous sign-ins' aanstaat bij Authentication > Sign In / Providers in je Supabase-project, en laad de pagina opnieuw."
+      );
+    }
+  }
+  boot();
 
   // keep "today" fresh if the tab stays open across midnight
   setInterval(function () {
