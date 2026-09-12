@@ -288,6 +288,33 @@ legend {
 
 .tijdslot-option input { margin: 0; width: auto; }
 
+.standaard-taak-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border);
+}
+
+.standaard-taak-wrap label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.standaard-taak-select {
+  font-size: 0.85rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.standaard-taak-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .tijdslot-option input:disabled {
   cursor: not-allowed;
 }
@@ -758,7 +785,7 @@ th { color: var(--muted); font-weight: 600; }
           </label>
         </fieldset>
 
-        <p class="fieldset-hint">Vink per dag aan of iemand vast werkt of alleen beschikbaar is (nooit allebei voor dezelfde dag), en kies daarna een of meer tijdopties (zie Bezetting-tab om de opties per dag aan te passen). De twee kolommen hieronder vul je gewoon naast elkaar in — vaste dagen in de linkerkolom, de overige beschikbare dagen in de rechter.</p>
+        <p class="fieldset-hint">Vink per dag aan of iemand vast werkt of alleen beschikbaar is (nooit allebei voor dezelfde dag), en kies daarna een of meer tijdopties (zie Bezetting-tab om de opties per dag aan te passen). De twee kolommen hieronder vul je gewoon naast elkaar in — vaste dagen in de linkerkolom, de overige beschikbare dagen in de rechter. Kies daarnaast per dag optioneel een "standaard taak" (bijv. Fleur staat standaard aan de plaat op vrijdag) — de generator geeft die combinatie dan voorrang.</p>
         <div class="dagen-columns">
           <fieldset>
             <legend>Vaste werkdagen</legend>
@@ -1196,6 +1223,10 @@ th { color: var(--muted); font-weight: 600; }
           // Migratie: het oudere hele-dag/avondspits-model kende geen concrete tijden,
           // dus die dagen starten leeg en moeten opnieuw met tijdopties ingevuld worden.
           tijdsloten: Array.isArray(entry.tijdsloten) ? entry.tijdsloten : [],
+          // De taak die iemand op deze dag normaal gesproken doet (bijv. "Fleur staat
+          // standaard aan de plaat op vrijdag") — hieronder verder gevalideerd zodra
+          // clean.taken bekend is, want dit moet altijd een taak zijn die ze ook echt kunnen.
+          standaardTaak: entry.standaardTaak ? migrateTaskKey(entry.standaardTaak) : null,
         };
       });
     } else if (Array.isArray(emp.vasteDagen)) {
@@ -1218,6 +1249,11 @@ th { color: var(--muted); font-weight: 600; }
     clean.taken = Array.isArray(emp.taken)
       ? Array.from(new Set(emp.taken.map(migrateTaskKey).filter((t) => TASKS.some((task) => task.key === t))))
       : [];
+    // Een standaardtaak per dag moet altijd een taak zijn die de medewerker ook echt kan.
+    Object.keys(clean.dagen).forEach((day) => {
+      const entry = clean.dagen[day];
+      entry.standaardTaak = entry.standaardTaak && clean.taken.includes(entry.standaardTaak) ? entry.standaardTaak : null;
+    });
     // Secundaire taken: kan de medewerker wel, maar doet die niet vaak/niet het liefst —
     // moet altijd een subset van "taken" blijven.
     clean.secundaireTaken = Array.isArray(emp.secundaireTaken)
@@ -1814,6 +1850,7 @@ th { color: var(--muted); font-weight: 600; }
         });
         secundairCheckbox.disabled = !checkbox.checked;
         if (!checkbox.checked) secundairCheckbox.checked = false;
+        refreshStandaardTaakSelects();
       });
 
       row.appendChild(label);
@@ -1905,15 +1942,50 @@ th { color: var(--muted); font-weight: 600; }
       tijdslotenBox.dataset.day = item.key;
       renderTijdslotCheckboxes(tijdslotenBox, item.key);
 
+      const standaardWrap = document.createElement("div");
+      standaardWrap.className = "standaard-taak-wrap";
+      const standaardLabel = document.createElement("label");
+      standaardLabel.textContent = "Standaard taak op deze dag:";
+      const standaardSelect = document.createElement("select");
+      standaardSelect.className = "standaard-taak-select";
+      standaardSelect.disabled = true;
+      standaardWrap.appendChild(standaardLabel);
+      standaardWrap.appendChild(standaardSelect);
+      renderStandaardTaakOptions(standaardSelect);
+
       checkbox.addEventListener("change", () => {
         setTijdslotenBoxEnabled(tijdslotenBox, checkbox.checked);
+        standaardSelect.disabled = !checkbox.checked;
+        if (!checkbox.checked) standaardSelect.value = "";
         if (checkbox.checked) uncheckOtherGroup(groupName, item.key);
       });
 
       row.appendChild(label);
       row.appendChild(tijdslotenBox);
+      row.appendChild(standaardWrap);
       container.appendChild(row);
     });
+  }
+
+  // Vult een "standaard taak"-select met de taken die de medewerker nu aangevinkt heeft in
+  // het Takenpakket hierboven, zodat je per (vaste/beschikbare) werkdag kunt aangeven welke
+  // taak deze persoon daar normaal gesproken doet (bijv. "Fleur staat standaard aan de plaat
+  // op vrijdag") — de generator geeft die combinatie dan voorrang bij het inplannen.
+  function getCheckedTakenList() {
+    return Array.from(document.querySelectorAll("#employee-taken .taak-row"))
+      .filter((row) => row.querySelector('input[name="taken"]').checked)
+      .map((row) => ({ key: row.dataset.task, label: taskLabel(row.dataset.task) }));
+  }
+  function renderStandaardTaakOptions(select, keepValue) {
+    const checkedTaken = getCheckedTakenList();
+    const prevValue = keepValue !== undefined ? keepValue : select.value;
+    select.innerHTML =
+      '<option value="">— geen vaste voorkeur —</option>' +
+      checkedTaken.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+    select.value = checkedTaken.some((t) => t.key === prevValue) ? prevValue : "";
+  }
+  function refreshStandaardTaakSelects() {
+    document.querySelectorAll(".standaard-taak-select").forEach((select) => renderStandaardTaakOptions(select));
   }
 
   function renderTijdslotCheckboxes(box, dayKey) {
@@ -2024,7 +2096,9 @@ th { color: var(--muted); font-weight: 600; }
         const tijdsloten = Array.from(row.querySelectorAll('.tijdsloten-box input[type="checkbox"]:checked')).map(
           (cb) => cb.value
         );
-        dagen[day] = { type, tijdsloten };
+        const standaardSelect = row.querySelector(".standaard-taak-select");
+        const standaardTaak = (standaardSelect && standaardSelect.value) || null;
+        dagen[day] = { type, tijdsloten, standaardTaak };
       });
     });
     return dagen;
@@ -2047,6 +2121,9 @@ th { color: var(--muted); font-weight: 600; }
         box.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
           cb.checked = !cb.disabled && selected.has(cb.value);
         });
+        const standaardSelect = row.querySelector(".standaard-taak-select");
+        standaardSelect.disabled = !checked;
+        renderStandaardTaakOptions(standaardSelect, checked ? entry.standaardTaak || "" : "");
       });
     });
   }
@@ -2327,12 +2404,14 @@ th { color: var(--muted); font-weight: 600; }
           "—";
         tr.appendChild(tdTaken);
 
+        const standaardSuffix = (d) => (emp.dagen[d].standaardTaak ? ` — standaard: ${taskLabel(emp.dagen[d].standaardTaak)}` : "");
+
         const tdDagen = document.createElement("td");
         tdDagen.innerHTML =
           vasteDagenOf(emp)
             .map(
               (d) =>
-                `<span class="tag">${dayLabel(d)}: ${(emp.dagen[d].tijdsloten || []).join(", ") || "geen tijden gekozen"}</span>`
+                `<span class="tag">${dayLabel(d)}: ${(emp.dagen[d].tijdsloten || []).join(", ") || "geen tijden gekozen"}${standaardSuffix(d)}</span>`
             )
             .join("") || "—";
         tr.appendChild(tdDagen);
@@ -2344,7 +2423,7 @@ th { color: var(--muted); font-weight: 600; }
               (d) =>
                 `<span class="tag tag-beschikbaar">${dayLabel(d)}: ${
                   (emp.dagen[d].tijdsloten || []).join(", ") || "geen tijden gekozen"
-                }</span>`
+                }${standaardSuffix(d)}</span>`
             )
             .join("") || "—";
         tr.appendChild(tdBeschikbaar);
@@ -2823,10 +2902,20 @@ th { color: var(--muted); font-weight: 600; }
       // dienstaanvraag, die altijd voorrang houdt.
       const isSecundairVoorTaak = (e) =>
         isSecundaireTaak(e, task) || (task === "assistentplaat" && !e.taken.includes("assistentplaat") && e.taken.includes("hoofdplaat"));
+      // Iemands "standaard taak" op deze dag (bijv. Fleur staat standaard aan de plaat op
+      // vrijdag) gaat vóór de gewone eerlijke-verdeling/voorkeurs-volgorde, maar een expliciete
+      // dienstaanvraag voor een andere taak die dag houdt nog altijd de hoogste voorrang.
+      const heeftStandaardTaakHier = (e) => {
+        const dagInfo = e.dagen[day.key];
+        return !!(dagInfo && dagInfo.standaardTaak === task);
+      };
       const byPriorityMetAanvraag = (a, b) => {
         const reqA = heeftDienstaanvraag(a, day, task) ? 0 : 1;
         const reqB = heeftDienstaanvraag(b, day, task) ? 0 : 1;
         if (reqA !== reqB) return reqA - reqB;
+        const stdA = heeftStandaardTaakHier(a) ? 0 : 1;
+        const stdB = heeftStandaardTaakHier(b) ? 0 : 1;
+        if (stdA !== stdB) return stdA - stdB;
         const secA = isSecundairVoorTaak(a) ? 1 : 0;
         const secB = isSecundairVoorTaak(b) ? 1 : 0;
         if (secA !== secB) return secA - secB;
@@ -3005,6 +3094,9 @@ th { color: var(--muted); font-weight: 600; }
                 suffix += " (als hoofd)";
               } else if (isSecundaireTaak(emp, task.key)) {
                 suffix += " (secundair)";
+              }
+              if (dagInfo && dagInfo.standaardTaak === task.key) {
+                suffix += " (standaard)";
               }
               html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
             });
