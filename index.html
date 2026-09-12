@@ -785,6 +785,15 @@ th { color: var(--muted); font-weight: 600; }
           </label>
         </fieldset>
 
+        <fieldset>
+          <legend>Werkwensen</legend>
+          <label>
+            Maximaal aantal diensten per week
+            <input type="number" id="employee-max-diensten" min="1" step="1" placeholder="Geen maximum">
+          </label>
+          <p class="fieldset-hint">Een richtlijn, geen harde grens: als het rooster echt niet anders kan, mag iemand hier een keer overheen gaan. Leeg laten = geen maximum.</p>
+        </fieldset>
+
         <p class="fieldset-hint">Vink per dag aan of iemand vast werkt of alleen beschikbaar is (nooit allebei voor dezelfde dag), en kies daarna een of meer tijdopties (zie Bezetting-tab om de opties per dag aan te passen). De twee kolommen hieronder vul je gewoon naast elkaar in — vaste dagen in de linkerkolom, de overige beschikbare dagen in de rechter. Kies daarnaast per dag optioneel een "standaard taak" (bijv. Fleur staat standaard aan de plaat op vrijdag) — de generator geeft die combinatie dan voorrang.</p>
         <div class="dagen-columns">
           <fieldset>
@@ -913,13 +922,13 @@ th { color: var(--muted); font-weight: 600; }
       <p class="fieldset-hint">
         Tijdopties (1 per regel, bijv. "16:30 - 20:00" of "17:00 - sluit") bepalen welke keuzes medewerkers straks kunnen
         aanvinken bij hun werkdagen. Openers (1 per regel, bijv. "10:30,2" = 2 mensen om 10:30) en aantal sluiters
-        bepalen hoeveel mensen er op elk moment moeten openen/sluiten; de generator vult dit automatisch in.
-        "Sluitingstijd" is alleen voor de urenberekening — op het rooster zelf blijft "sluit" gewoon "sluit" staan.
+        bepalen hoeveel mensen er op elk moment moeten openen/sluiten. Een sleutelhouder krijgt zowel bij openen als
+        sluiten voorrang. "Vaste aanvangstijden" werkt net als openers (1 per regel, "tijd,aantal" of
+        "tijd,aantal,taak" — bijv. "16:30,2,fietsbezorgen" = 2 mensen om 16:30, waarvan bij voorkeur 1 fietsbezorger),
+        maar dan voor een gewone latere instroom-golf in plaats van het openen van de zaak zelf.
+        "Sluitingstijd" is per dag instelbaar en is alleen voor de urenberekening — op het rooster zelf blijft "sluit"
+        gewoon "sluit" staan.
       </p>
-      <label>
-        Sluitingstijd (voor urenberekening)
-        <input type="time" id="sluitingstijd-input">
-      </label>
       <div class="table-scroll">
         <table id="open-sluit-table">
           <thead>
@@ -927,7 +936,9 @@ th { color: var(--muted); font-weight: 600; }
               <th>Dag</th>
               <th>Tijdopties</th>
               <th>Openers</th>
+              <th>Vaste aanvangstijden</th>
               <th>Aantal sluiters</th>
+              <th>Sluitingstijd</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -1118,6 +1129,13 @@ th { color: var(--muted); font-weight: 600; }
   // Tijdopties, openers en aantal sluiters per dag. "Sluit" is een letterlijke waarde
   // (geen vaste klok tijd) — pas op het rooster gewoon getoond als "sluit".
   // Zaterdag is een aanname (zelfde patroon als woensdag); via Bezetting > Openen & sluiten aan te passen.
+  // "vasteAanvangstijden" is net als "openers" een gereserveerd aantal mensen op een vast
+  // tijdstip, maar dan zonder het "openen"-gedrag (geen invloed op de openen-tot-sluit-
+  // restrictie, geen sleutelhouder-voorrang) — puur een gewone, latere instroom-golf. Een
+  // optioneel "taak" veld betekent: probeer minstens 1 van deze mensen op die taak te zetten
+  // (bijv. "1 van de 2 om 16:30 moet fietsbezorger zijn").
+  const DEFAULT_VASTE_AANVANGSTIJDEN = [{ tijd: "16:30", aantal: 2, taak: "fietsbezorgen" }];
+
   const DEFAULT_OPEN_SLUIT = {
     dinsdag: {
       tijdsloten: [
@@ -1126,6 +1144,8 @@ th { color: var(--muted); font-weight: 600; }
       ],
       openers: [{ tijd: "14:00", aantal: 2 }],
       sluiters: 4,
+      sluitingstijd: "20:30",
+      vasteAanvangstijden: DEFAULT_VASTE_AANVANGSTIJDEN,
     },
     woensdag: {
       tijdsloten: [
@@ -1134,35 +1154,50 @@ th { color: var(--muted); font-weight: 600; }
       ],
       openers: [{ tijd: "10:30", aantal: 2 }],
       sluiters: 4,
+      sluitingstijd: "20:30",
+      vasteAanvangstijden: DEFAULT_VASTE_AANVANGSTIJDEN,
     },
     donderdag: {
       tijdsloten: [
-        "10:30 - 19:30", "10:30 - sluit", "14:00 - sluit", "14:00 - 20:00", "16:30 - 19:30",
-        "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
+        "10:30 - 19:30", "10:30 - sluit", "12:00 - sluit", "12:00 - 20:00", "14:00 - sluit", "14:00 - 20:00",
+        "16:30 - 19:30", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
       ],
-      openers: [{ tijd: "10:30", aantal: 2 }],
+      openers: [{ tijd: "10:30", aantal: 2 }, { tijd: "12:00", aantal: 1 }],
       sluiters: 4,
+      sluitingstijd: "21:00",
+      vasteAanvangstijden: DEFAULT_VASTE_AANVANGSTIJDEN,
     },
     vrijdag: {
       tijdsloten: [
         "10:00 - 19:30", "10:30 - 19:30", "10:30 - sluit", "11:00 - 20:00", "11:00 - sluit", "11:30 - 14:00",
         "15:00 - sluit", "15:00 - 20:00", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
       ],
-      openers: [{ tijd: "10:00", aantal: 2 }, { tijd: "10:30", aantal: 1 }, { tijd: "11:00", aantal: 1 }],
+      openers: [
+        { tijd: "10:00", aantal: 2 },
+        { tijd: "10:30", aantal: 1 },
+        { tijd: "11:00", aantal: 1 },
+        { tijd: "15:00", aantal: 1 },
+      ],
       sluiters: 4,
+      sluitingstijd: "21:00",
+      vasteAanvangstijden: DEFAULT_VASTE_AANVANGSTIJDEN,
     },
     zaterdag: {
       tijdsloten: ["10:30 - 19:30", "10:30 - sluit", "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00"],
       openers: [{ tijd: "10:30", aantal: 2 }],
       sluiters: 4,
+      sluitingstijd: "21:00",
+      vasteAanvangstijden: DEFAULT_VASTE_AANVANGSTIJDEN,
     },
     zondag: {
       tijdsloten: [
         "10:30 - 19:30", "10:30 - sluit", "14:00 - sluit", "14:00 - 20:00",
         "16:30 - sluit", "16:30 - 20:00", "17:00 - sluit", "17:00 - 20:00",
       ],
-      openers: [{ tijd: "10:30", aantal: 2 }],
+      openers: [{ tijd: "10:30", aantal: 2 }, { tijd: "14:00", aantal: 1 }],
       sluiters: 4,
+      sluitingstijd: "21:00",
+      vasteAanvangstijden: DEFAULT_VASTE_AANVANGSTIJDEN,
     },
   };
   const DEFAULT_SLUITINGSTIJD = "21:00";
@@ -1194,6 +1229,17 @@ th { color: var(--muted); font-weight: 600; }
   }
   function baseTaskKey(scheduleKey) {
     return scheduleKey.split("__")[0];
+  }
+  // Bouwt medewerker-id -> taak (bijv. voor "wie doet vandaag fietsbezorgen") vanuit het
+  // rooster van 1 dag, gebruikt om vaste-aanvangstijden met een taakvoorkeur te vervullen.
+  function taskByEmployeeIdFor(dayScheduleObj) {
+    const map = {};
+    Object.keys(dayScheduleObj || {}).forEach((scheduleKey) => {
+      (dayScheduleObj[scheduleKey] || []).forEach((id) => {
+        if (id) map[id] = baseTaskKey(scheduleKey);
+      });
+    });
+    return map;
   }
   // Geeft, voor een taak op een dag, de groep(en) bezetting terug die daar gelden: bij een
   // gewone dag is dat er hooguit 1 (de hele dag), bij een dagdeel-dag kunnen dat er 2 zijn
@@ -1283,6 +1329,10 @@ th { color: var(--muted); font-weight: 600; }
       uren: typeof contract.uren === "number" && contract.uren > 0 ? contract.uren : 0,
       periode: contract.periode === "maand" ? "maand" : "week",
     };
+    // Richtlijn voor het maximum aantal diensten per week dat iemand wíl werken (geen harde
+    // grens: als het niet anders kan, mag iemand er best een keer overheen). null = geen limiet.
+    clean.maxDiensten =
+      typeof emp.maxDiensten === "number" && emp.maxDiensten > 0 ? Math.round(emp.maxDiensten) : null;
     return clean;
   }
 
@@ -1352,6 +1402,7 @@ th { color: var(--muted); font-weight: 600; }
       contract: row.contract || { vast: false, uren: 0, periode: "week" },
       verlof: row.verlof || [],
       dienstAanvragen: row.dienst_aanvragen || [],
+      maxDiensten: typeof row.max_diensten === "number" ? row.max_diensten : null,
     };
   }
   function employeeObjToRow(emp) {
@@ -1368,14 +1419,15 @@ th { color: var(--muted); font-weight: 600; }
       contract: emp.contract,
       verlof: emp.verlof,
       dienst_aanvragen: emp.dienstAanvragen,
+      max_diensten: emp.maxDiensten,
       updated_at: new Date().toISOString(),
     };
   }
 
   // ---------- Storage helpers (Supabase-backed) ----------
   //
-  // De rest van de app leest/schrijft employees/requirements/openSluit/sluitingstijd/
-  // forbiddenPairs/scheduleStore als gewone in-memory variabelen (net als voorheen met
+  // De rest van de app leest/schrijft employees/requirements/openSluit/forbiddenPairs/
+  // scheduleStore als gewone in-memory variabelen (net als voorheen met
   // localStorage). load*() haalt bij het opstarten éénmalig alles op uit Supabase; save*()
   // stuurt de wijziging naar Supabase (niet afgewacht door de aanroeper, net zoals
   // localStorage.setItem altijd synchroon "klaar" leek) en meldt een fout via de
@@ -1485,7 +1537,9 @@ th { color: var(--muted); font-weight: 600; }
   }
 
   async function loadOpenSluit() {
-    const { data, error } = await supabaseClient.from("open_sluit").select("day_key, tijdsloten, openers, sluiters");
+    const { data, error } = await supabaseClient
+      .from("open_sluit")
+      .select("day_key, tijdsloten, openers, sluiters, sluitingstijd, vaste_aanvangstijden");
     if (error) throw error;
     const parsed = {};
     (data || []).forEach((row) => (parsed[row.day_key] = row));
@@ -1497,6 +1551,10 @@ th { color: var(--muted); font-weight: 600; }
         tijdsloten: Array.isArray(entry.tijdsloten) ? entry.tijdsloten : fallback.tijdsloten.slice(),
         openers: Array.isArray(entry.openers) ? entry.openers : fallback.openers.slice(),
         sluiters: typeof entry.sluiters === "number" ? entry.sluiters : fallback.sluiters,
+        sluitingstijd: entry.sluitingstijd || fallback.sluitingstijd,
+        vasteAanvangstijden: Array.isArray(entry.vaste_aanvangstijden)
+          ? entry.vaste_aanvangstijden
+          : fallback.vasteAanvangstijden.slice(),
       };
     });
     return result;
@@ -1510,6 +1568,8 @@ th { color: var(--muted); font-weight: 600; }
             tijdsloten: (data[d.key] && data[d.key].tijdsloten) || [],
             openers: (data[d.key] && data[d.key].openers) || [],
             sluiters: (data[d.key] && data[d.key].sluiters) || 0,
+            sluitingstijd: (data[d.key] && data[d.key].sluitingstijd) || DEFAULT_SLUITINGSTIJD,
+            vaste_aanvangstijden: (data[d.key] && data[d.key].vasteAanvangstijden) || [],
             updated_at: new Date().toISOString(),
           }));
           const { error } = await supabaseClient.from("open_sluit").upsert(rows);
@@ -1521,29 +1581,6 @@ th { color: var(--muted); font-weight: 600; }
     } catch (err) {
       console.error("Kon openen & sluiten niet opslaan in Supabase:", err);
       showSaveError("Openen & sluiten opslaan is mislukt: " + (err.message || err));
-    }
-  }
-
-  async function loadSluitingstijd() {
-    const { data, error } = await supabaseClient.from("app_settings").select("value").eq("key", "sluitingstijd").maybeSingle();
-    if (error) throw error;
-    return (data && data.value) || DEFAULT_SLUITINGSTIJD;
-  }
-  async function saveSluitingstijd(val) {
-    try {
-      await withTimeout(
-        (async () => {
-          const { error } = await supabaseClient
-            .from("app_settings")
-            .upsert({ key: "sluitingstijd", value: val, updated_at: new Date().toISOString() });
-          if (error) throw error;
-        })(),
-        15000,
-        "sluitingstijd opslaan"
-      );
-    } catch (err) {
-      console.error("Kon sluitingstijd niet opslaan in Supabase:", err);
-      showSaveError("Sluitingstijd opslaan is mislukt: " + (err.message || err));
     }
   }
 
@@ -1598,7 +1635,6 @@ th { color: var(--muted); font-weight: 600; }
   let employees = [];
   let requirements = JSON.parse(JSON.stringify(DEFAULT_REQUIREMENTS));
   let openSluit = JSON.parse(JSON.stringify(DEFAULT_OPEN_SLUIT));
-  let sluitingstijd = DEFAULT_SLUITINGSTIJD;
   let forbiddenPairs = {};
   let editingEmployeeId = null;
   let employeeFormVerlof = [];
@@ -1660,8 +1696,11 @@ th { color: var(--muted); font-weight: 600; }
     const [h, m] = (t || "0:0").split(":").map(Number);
     return h * 60 + m;
   }
-  function durationHours(start, eind) {
-    const eindResolved = eind === "sluit" ? sluitingstijd : eind;
+  function sluitingstijdVoorDag(dayKey) {
+    return (openSluit[dayKey] && openSluit[dayKey].sluitingstijd) || DEFAULT_SLUITINGSTIJD;
+  }
+  function durationHours(start, eind, dayKey) {
+    const eindResolved = eind === "sluit" ? sluitingstijdVoorDag(dayKey) : eind;
     const mins = timeToMinutes(eindResolved) - timeToMinutes(start);
     return Math.max(0, mins) / 60;
   }
@@ -1687,7 +1726,7 @@ th { color: var(--muted); font-weight: 600; }
         } else if (verlofEntry.type === "vanaf") {
           // Vrij vanaf een tijdstip: alleen opties die daarvoor al klaar zijn.
           const cutoff = timeToMinutes(verlofEntry.tijd);
-          opts = opts.filter((opt) => timeToMinutes(opt.eind === "sluit" ? sluitingstijd : opt.eind) <= cutoff);
+          opts = opts.filter((opt) => timeToMinutes(opt.eind === "sluit" ? sluitingstijdVoorDag(dayKey) : opt.eind) <= cutoff);
         } else if (verlofEntry.type === "tot") {
           // Vrij tot een tijdstip: alleen opties die daarna pas beginnen.
           const cutoff = timeToMinutes(verlofEntry.tijd);
@@ -1700,27 +1739,33 @@ th { color: var(--muted); font-weight: 600; }
   function gemiddeldeUrenPerDienstGeschat() {
     const alleDuren = [];
     DAYS.forEach((day) => {
-      tijdslotenForDay(day.key).forEach((opt) => alleDuren.push(durationHours(opt.start, opt.eind)));
+      tijdslotenForDay(day.key).forEach((opt) => alleDuren.push(durationHours(opt.start, opt.eind, day.key)));
     });
     if (!alleDuren.length) return 6;
     return alleDuren.reduce((a, b) => a + b, 0) / alleDuren.length;
   }
 
   // Wijst voor een dag tijdopties toe aan de reeds op taken ingedeelde medewerkers: eerst
-  // de openers op de ingestelde openingstijden, dan precies het ingestelde aantal sluiters,
-  // en de rest krijgt een resterende optie (bij voorkeur niet tot sluit).
-  function assignTijdslotenForDay(dayKey, dateIso, employeeIds) {
-    const daySettings = openSluit[dayKey] || { openers: [], sluiters: 0 };
+  // de openers op de ingestelde openingstijden (sleutelhouders krijgen voorrang, want er is
+  // een sleutel nodig om open te kunnen doen), dan de vaste-aanvangstijden (een gewone
+  // instroom-golf, geen invloed op de openen-tot-sluit-restrictie), dan precies het
+  // ingestelde aantal sluiters, en de rest krijgt een resterende optie (bij voorkeur niet
+  // tot sluit). `taskByEmployeeId` (optioneel) is nodig om een taakvoorkeur bij een vaste
+  // aanvangstijd (bijv. "1 van de 2 om 16:30 moet fietsbezorger zijn") te kunnen vervullen.
+  function assignTijdslotenForDay(dayKey, dateIso, employeeIds, taskByEmployeeId) {
+    const daySettings = openSluit[dayKey] || { openers: [], sluiters: 0, vasteAanvangstijden: [] };
     const assignments = {};
     const warnings = [];
     const remaining = new Set(employeeIds);
     const empById = (id) => employees.find((e) => e.id === id);
 
     (daySettings.openers || []).forEach(({ tijd, aantal }) => {
+      // Sleutelhouders krijgen voorrang om te openen, zodat er zoveel mogelijk automatisch
+      // minstens 1 sleutelhouder aanwezig is om de zaak daadwerkelijk open te kunnen doen.
       const candidates = Array.from(remaining)
         .map(empById)
         .filter((e) => e && employeeTijdslotOptions(e, dayKey, dateIso).some((o) => o.start === tijd))
-        .sort((a, b) => a.naam.localeCompare(b.naam));
+        .sort((a, b) => (b.heeftSleutel ? 1 : 0) - (a.heeftSleutel ? 1 : 0) || a.naam.localeCompare(b.naam));
       const gekozen = candidates.slice(0, aantal);
       gekozen.forEach((e) => {
         const opts = employeeTijdslotOptions(e, dayKey, dateIso).filter((o) => o.start === tijd);
@@ -1729,6 +1774,48 @@ th { color: var(--muted); font-weight: 600; }
       });
       if (gekozen.length < aantal) {
         warnings.push(`${dayLabel(dayKey)}: ${aantal - gekozen.length} tekort aan openers om ${tijd}`);
+      }
+    });
+
+    if ((daySettings.openers || []).length > 0) {
+      const openersGekozen = Object.keys(assignments).filter((id) =>
+        (daySettings.openers || []).some((o) => o.tijd === assignments[id].start)
+      );
+      const heeftSleutelhouderBijOpenen = openersGekozen.some((id) => {
+        const e = empById(id);
+        return e && e.heeftSleutel;
+      });
+      if (openersGekozen.length > 0 && !heeftSleutelhouderBijOpenen) {
+        warnings.push(`${dayLabel(dayKey)}: niemand met een sleutel staat ingepland om te openen.`);
+      }
+    }
+
+    (daySettings.vasteAanvangstijden || []).forEach(({ tijd, aantal, taak }) => {
+      let candidates = Array.from(remaining)
+        .map(empById)
+        .filter((e) => e && employeeTijdslotOptions(e, dayKey, dateIso).some((o) => o.start === tijd));
+      // Bij een taakvoorkeur (bijv. fietsbezorgen) proberen we eerst iemand te kiezen die
+      // die taak vandaag al doet, zodat de wens "1 van deze mensen doet taak X" zoveel
+      // mogelijk vanzelf uitkomt.
+      candidates = candidates.sort((a, b) => {
+        if (taak && taskByEmployeeId) {
+          const aMatch = taskByEmployeeId[a.id] === taak ? 0 : 1;
+          const bMatch = taskByEmployeeId[b.id] === taak ? 0 : 1;
+          if (aMatch !== bMatch) return aMatch - bMatch;
+        }
+        return a.naam.localeCompare(b.naam);
+      });
+      const gekozen = candidates.slice(0, aantal);
+      gekozen.forEach((e) => {
+        const opts = employeeTijdslotOptions(e, dayKey, dateIso).filter((o) => o.start === tijd);
+        assignments[e.id] = opts.find((o) => o.eind !== "sluit") || opts[0];
+        remaining.delete(e.id);
+      });
+      if (gekozen.length < aantal) {
+        warnings.push(`${dayLabel(dayKey)}: ${aantal - gekozen.length} tekort aan mensen om ${tijd} te beginnen`);
+      }
+      if (taak && gekozen.length > 0 && !gekozen.some((e) => taskByEmployeeId && taskByEmployeeId[e.id] === taak)) {
+        warnings.push(`${dayLabel(dayKey)}: niemand van de mensen die om ${tijd} beginnen doet vandaag ${taskLabel(taak)}.`);
       }
     });
 
@@ -2083,6 +2170,15 @@ th { color: var(--muted); font-weight: 600; }
     heeftSleutelCheckbox.checked = !!val;
   }
 
+  const maxDienstenInput = document.getElementById("employee-max-diensten");
+  function getMaxDiensten() {
+    const val = parseInt(maxDienstenInput.value, 10);
+    return Number.isFinite(val) && val > 0 ? val : null;
+  }
+  function setMaxDiensten(val) {
+    maxDienstenInput.value = typeof val === "number" && val > 0 ? val : "";
+  }
+
   function getDagenData() {
     const dagen = {};
     [
@@ -2282,6 +2378,7 @@ th { color: var(--muted); font-weight: 600; }
     setTakenData([], {});
     setMagOpenTotSluit(false);
     setHeeftSleutel(false);
+    setMaxDiensten(null);
     setNooitAlleenBij(null);
     setDagenData({});
     setContractData(null);
@@ -2298,6 +2395,7 @@ th { color: var(--muted); font-weight: 600; }
     const { taken, takenUitzonderingen, secundaireTaken } = getTakenData();
     const magOpenTotSluit = getMagOpenTotSluit();
     const heeftSleutel = getHeeftSleutel();
+    const maxDiensten = getMaxDiensten();
     const nooitAlleenBij = getNooitAlleenBij();
     const dagen = getDagenData();
     const contract = getContractData();
@@ -2310,6 +2408,7 @@ th { color: var(--muted); font-weight: 600; }
       emp.secundaireTaken = secundaireTaken;
       emp.magOpenTotSluit = magOpenTotSluit;
       emp.heeftSleutel = heeftSleutel;
+      emp.maxDiensten = maxDiensten;
       emp.nooitAlleenBij = nooitAlleenBij;
       emp.dagen = dagen;
       emp.contract = contract;
@@ -2324,6 +2423,7 @@ th { color: var(--muted); font-weight: 600; }
         secundaireTaken,
         magOpenTotSluit,
         heeftSleutel,
+        maxDiensten,
         nooitAlleenBij,
         dagen,
         contract,
@@ -2348,6 +2448,7 @@ th { color: var(--muted); font-weight: 600; }
     setTakenData(emp.taken, emp.takenUitzonderingen, emp.secundaireTaken);
     setMagOpenTotSluit(emp.magOpenTotSluit);
     setHeeftSleutel(emp.heeftSleutel);
+    setMaxDiensten(emp.maxDiensten);
     setNooitAlleenBij(emp.nooitAlleenBij);
     setDagenData(emp.dagen);
     setContractData(emp.contract);
@@ -2429,9 +2530,12 @@ th { color: var(--muted); font-weight: 600; }
         tr.appendChild(tdBeschikbaar);
 
         const tdContract = document.createElement("td");
-        tdContract.innerHTML = emp.contract && emp.contract.vast
-          ? `<span class="tag">Vast · ${emp.contract.uren}u per ${emp.contract.periode === "maand" ? "maand" : "week"}</span>`
-          : "—";
+        tdContract.innerHTML =
+          (emp.contract && emp.contract.vast
+            ? `<span class="tag">Vast · ${emp.contract.uren}u per ${emp.contract.periode === "maand" ? "maand" : "week"}</span>`
+            : "") +
+          (emp.maxDiensten ? `<span class="tag">Max ${emp.maxDiensten} dienst${emp.maxDiensten === 1 ? "" : "en"}/week</span>` : "") ||
+          "—";
         tr.appendChild(tdContract);
 
         const tdVerlof = document.createElement("td");
@@ -2476,7 +2580,7 @@ th { color: var(--muted); font-weight: 600; }
   // ---------- Export / import ----------
 
   document.getElementById("export-btn").addEventListener("click", () => {
-    const data = { employees, requirements, openSluit, sluitingstijd, forbiddenPairs };
+    const data = { employees, requirements, openSluit, forbiddenPairs };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -2506,10 +2610,6 @@ th { color: var(--muted); font-weight: 600; }
         if (data.openSluit) {
           openSluit = data.openSluit;
           await saveOpenSluit(openSluit);
-        }
-        if (data.sluitingstijd) {
-          sluitingstijd = data.sluitingstijd;
-          await saveSluitingstijd(sluitingstijd);
         }
         if (data.forbiddenPairs) {
           forbiddenPairs = data.forbiddenPairs;
@@ -2632,7 +2732,6 @@ th { color: var(--muted); font-weight: 600; }
   // ---------- Openen & sluiten ----------
 
   function renderOpenSluitTable() {
-    document.getElementById("sluitingstijd-input").value = sluitingstijd;
     const tbody = document.createElement("tbody");
     DAYS.forEach((day) => {
       const settings = openSluit[day.key];
@@ -2660,6 +2759,17 @@ th { color: var(--muted); font-weight: 600; }
       tdOpeners.appendChild(openersTextarea);
       tr.appendChild(tdOpeners);
 
+      const tdAanvang = document.createElement("td");
+      const aanvangTextarea = document.createElement("textarea");
+      aanvangTextarea.id = `open-sluit-aanvang-${day.key}`;
+      aanvangTextarea.rows = 4;
+      aanvangTextarea.placeholder = "16:30,2,fietsbezorgen";
+      aanvangTextarea.value = (settings.vasteAanvangstijden || [])
+        .map((a) => [a.tijd, a.aantal, a.taak].filter((v) => v !== undefined && v !== null && v !== "").join(","))
+        .join("\n");
+      tdAanvang.appendChild(aanvangTextarea);
+      tr.appendChild(tdAanvang);
+
       const tdSluiters = document.createElement("td");
       const sluitersInput = document.createElement("input");
       sluitersInput.type = "number";
@@ -2668,6 +2778,14 @@ th { color: var(--muted); font-weight: 600; }
       sluitersInput.value = settings.sluiters;
       tdSluiters.appendChild(sluitersInput);
       tr.appendChild(tdSluiters);
+
+      const tdSluitingstijd = document.createElement("td");
+      const sluitingstijdInput = document.createElement("input");
+      sluitingstijdInput.type = "time";
+      sluitingstijdInput.id = `open-sluit-sluitingstijd-${day.key}`;
+      sluitingstijdInput.value = settings.sluitingstijd || DEFAULT_SLUITINGSTIJD;
+      tdSluitingstijd.appendChild(sluitingstijdInput);
+      tr.appendChild(tdSluitingstijd);
 
       tbody.appendChild(tr);
     });
@@ -2694,13 +2812,24 @@ th { color: var(--muted); font-weight: 600; }
           return { tijd, aantal: parseInt(aantal, 10) || 0 };
         })
         .filter((o) => o.tijd);
+      const vasteAanvangstijden = document
+        .getElementById(`open-sluit-aanvang-${day.key}`)
+        .value.split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [tijd, aantal, taak] = line.split(",").map((s) => s.trim());
+          const entry = { tijd, aantal: parseInt(aantal, 10) || 0 };
+          if (taak) entry.taak = migrateTaskKey(taak);
+          return entry;
+        })
+        .filter((a) => a.tijd);
       const sluiters = parseInt(document.getElementById(`open-sluit-sluiters-${day.key}`).value, 10) || 0;
-      next[day.key] = { tijdsloten, openers, sluiters };
+      const sluitingstijd = document.getElementById(`open-sluit-sluitingstijd-${day.key}`).value || DEFAULT_SLUITINGSTIJD;
+      next[day.key] = { tijdsloten, openers, sluiters, vasteAanvangstijden, sluitingstijd };
     });
     openSluit = next;
     saveOpenSluit(openSluit);
-    sluitingstijd = document.getElementById("sluitingstijd-input").value || DEFAULT_SLUITINGSTIJD;
-    saveSluitingstijd(sluitingstijd);
     // Tijdopties per dag zijn veranderd: bouw de aanvink-lijsten in het medewerkersformulier opnieuw op.
     buildDagenRows(vasteDagenContainer, DAYS, "vast");
     buildDagenRows(beschikbaarDagenContainer, DAYS, "beschikbaar");
@@ -2816,10 +2945,10 @@ th { color: var(--muted); font-weight: 600; }
         });
       });
       if (!idsToday.has(emp.id)) return;
-      const auto = assignTijdslotenForDay(dayKey, dateIsoByDay[dayKey], Array.from(idsToday));
+      const auto = assignTijdslotenForDay(dayKey, dateIsoByDay[dayKey], Array.from(idsToday), taskByEmployeeIdFor(schedule[dayKey]));
       const { assignments } = mergeTijdslotOverrides(dayKey, auto.assignments, auto.warnings, scheduleData);
       const opt = assignments[emp.id];
-      if (opt) hours += durationHours(opt.start, opt.eind);
+      if (opt) hours += durationHours(opt.start, opt.eind, dayKey);
     });
     return hours;
   }
@@ -2869,7 +2998,14 @@ th { color: var(--muted); font-weight: 600; }
       if (effectiveTargetShifts[e.id] !== null) return shiftCount[e.id] < effectiveTargetShifts[e.id];
       return shiftCount[e.id] < MIN_SHIFTS_PER_WEEK;
     };
+    // Iemands "maximaal aantal diensten" is een richtlijn, geen harde grens: wie er al
+    // overheen zit komt pas als allerlaatste in aanmerking, zodat die alleen extra ingedeeld
+    // wordt als er echt niemand anders meer beschikbaar is voor die taak/dag.
+    const overMax = (e) => typeof e.maxDiensten === "number" && shiftCount[e.id] >= e.maxDiensten;
     const byPriority = (a, b) => {
+      const overA = overMax(a) ? 1 : 0;
+      const overB = overMax(b) ? 1 : 0;
+      if (overA !== overB) return overA - overB;
       const tierA = needsMore(a) ? 0 : 1;
       const tierB = needsMore(b) ? 0 : 1;
       if (tierA !== tierB) return tierA - tierB;
@@ -2991,7 +3127,7 @@ th { color: var(--muted); font-weight: 600; }
           if (avondCount > 0) {
             const avondChosen = pickCandidates(day, task, avondCount, excludeAndereTaak(), (e) =>
               employeeTijdslotOptions(e, day.key, day.dateIso).some(
-                (o) => (o.eind === "sluit" ? timeToMinutes(sluitingstijd) : timeToMinutes(o.eind)) > cutoff
+                (o) => (o.eind === "sluit" ? timeToMinutes(sluitingstijdVoorDag(day.key)) : timeToMinutes(o.eind)) > cutoff
               )
             );
             avondChosen.forEach((e) => {
@@ -3161,7 +3297,7 @@ th { color: var(--muted); font-weight: 600; }
           if (id) idsToday.add(id);
         });
       });
-      const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
+      const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday), taskByEmployeeIdFor(schedule[day.key]));
       const { assignments } = mergeTijdslotOverrides(day.key, auto.assignments, auto.warnings, currentScheduleData);
       const dayOverrides = (currentScheduleData.tijdslotOverrides && currentScheduleData.tijdslotOverrides[day.key]) || {};
       document.querySelectorAll(`.tijdslot-badge[data-day="${day.key}"]`).forEach((badge) => {
@@ -3289,6 +3425,11 @@ th { color: var(--muted); font-weight: 600; }
           `${e.naam} heeft maar ${shiftCounts[e.id]} dienst(en) deze week (streefdoel: minimaal ${MIN_SHIFTS_PER_WEEK}).`
         );
       }
+      if (typeof e.maxDiensten === "number" && shiftCounts[e.id] > e.maxDiensten) {
+        warnings.push(
+          `${e.naam} staat ${shiftCounts[e.id]} keer ingedeeld deze week, meer dan het gewenste maximum van ${e.maxDiensten}.`
+        );
+      }
     });
 
     currentWeekDates.forEach((day) => {
@@ -3298,7 +3439,7 @@ th { color: var(--muted); font-weight: 600; }
           if (id) idsToday.add(id);
         });
       });
-      const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday));
+      const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday), taskByEmployeeIdFor(schedule[day.key]));
       const { warnings: tijdslotWarnings } = mergeTijdslotOverrides(day.key, auto.assignments, auto.warnings, currentScheduleData);
       warnings.push(...tijdslotWarnings);
     });
@@ -3587,22 +3728,14 @@ th { color: var(--muted); font-weight: 600; }
           "De Supabase-client kon niet worden geladen (CDN-script of supabase-config.js ontbreekt of kon niet laden)."
         );
       }
-      const [emps, reqs, openSluitData, sluitTijd, pairs, schedules] = await withTimeout(
-        Promise.all([
-          loadEmployees(),
-          loadRequirements(),
-          loadOpenSluit(),
-          loadSluitingstijd(),
-          loadForbiddenPairs(),
-          loadAllSchedules(),
-        ]),
+      const [emps, reqs, openSluitData, pairs, schedules] = await withTimeout(
+        Promise.all([loadEmployees(), loadRequirements(), loadOpenSluit(), loadForbiddenPairs(), loadAllSchedules()]),
         15000,
         "gegevens ophalen"
       );
       employees = emps;
       requirements = reqs;
       openSluit = openSluitData;
-      sluitingstijd = sluitTijd;
       forbiddenPairs = pairs;
       scheduleStore = schedules;
 
