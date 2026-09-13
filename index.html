@@ -859,6 +859,7 @@ th { color: var(--muted); font-weight: 600; }
             <button type="button" id="add-verlof-btn" class="btn-secondary">+ Toevoegen</button>
           </div>
           <ul id="employee-verlof-list" class="verlof-list"></ul>
+          <div id="employee-verlof-impact" class="warnings-box" hidden></div>
         </fieldset>
 
         <fieldset>
@@ -1217,6 +1218,14 @@ th { color: var(--muted); font-weight: 600; }
   function dayLabel(key) {
     const d = DAYS.find((d) => d.key === key);
     return d ? d.label : key;
+  }
+  // Vertaalt een datum (ISO-string) naar de bijbehorende dagsleutel (bijv. "donderdag"),
+  // zodat verlof op een concrete datum gekoppeld kan worden aan de bezettingseisen van die
+  // weekdag. Geeft null voor maandag, want dan is de zaak dicht en gelden er geen eisen.
+  function dayKeyForDateIso(dateIso) {
+    const jsDay = new Date(dateIso + "T00:00:00Z").getUTCDay();
+    const day = DAYS.find((d) => d.jsDay === jsDay);
+    return day ? day.key : null;
   }
 
   // Een "dagdeel-dag" (zoals vrijdag) heeft een eigen bezetting per periode (middag/avond)
@@ -2279,6 +2288,60 @@ th { color: var(--muted); font-weight: 600; }
         li.appendChild(removeBtn);
         ul.appendChild(li);
       });
+    renderVerlofImpact();
+  }
+
+  // Laat direct bij het aanvragen van verlof zien of dit (samen met al bestaand verlof van
+  // anderen) een taak op die dag onmogelijk of erg krap maakt — bijv. als de 3e frietbakker
+  // die dag ook vrij vraagt. Alleen hele-dag-verlof telt mee, want gedeeltelijk verlof sluit
+  // iemand niet bij voorbaat uit.
+  function renderVerlofImpact() {
+    const box = document.getElementById("employee-verlof-impact");
+    const heleDagDatums = Array.from(
+      new Set(employeeFormVerlof.filter((v) => v.type === "hele_dag").map((v) => v.datum))
+    ).sort();
+    if (!heleDagDatums.length) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+    // Bij het bewerken van een bestaande medewerker simuleren we hun huidige formulierstatus
+    // (taken/dagen/verlof kunnen tijdens het bewerken al gewijzigd zijn t.o.v. wat is
+    // opgeslagen); bij een nieuwe, nog niet opgeslagen medewerker telt die vanzelfsprekend
+    // nog niet mee als "beschikbare capaciteit" voor iemand anders.
+    let tempEmployees = employees;
+    if (editingEmployeeId) {
+      const dagen = getDagenData();
+      const { taken } = getTakenData();
+      tempEmployees = employees.map((e) =>
+        e.id === editingEmployeeId ? Object.assign({}, e, { dagen, taken, verlof: employeeFormVerlof }) : e
+      );
+    }
+    const problemen = [];
+    heleDagDatums.forEach((datum) => {
+      const dayKey = dayKeyForDateIso(datum);
+      if (!dayKey) return;
+      computeTaskCapaciteitPerDag(dayKey, datum, tempEmployees)
+        .filter((t) => t.status !== "ok")
+        .forEach((t) => problemen.push({ datum, dayKey, ...t }));
+    });
+    if (!problemen.length) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+    box.hidden = false;
+    box.innerHTML =
+      "<strong>Let op, dit verlof maakt een taak dun bezet:</strong><ul>" +
+      problemen
+        .map(
+          (p) =>
+            `<li>${p.datum} (${dayLabel(p.dayKey)}): ${p.label} ${
+              p.status === "vol" ? "kan hierdoor niet meer bezet worden" : "wordt hierdoor erg krap"
+            } (${p.beschikbaar}/${p.benodigd} nog inzetbaar) — zoek hier een andere oplossing voor.</li>`
+        )
+        .join("") +
+      "</ul>";
   }
 
   const verlofTypeSelect = document.getElementById("employee-verlof-type");
@@ -3599,6 +3662,46 @@ th { color: var(--muted); font-weight: 600; }
     return { status: "ok", benodigd, beschikbaar };
   }
 
+  // Bepaalt per taak (bijv. friet) of er op deze dag nog genoeg mensen zijn die die taak
+  // kunnen doen en die dag werken, na aftrek van wie er hele dag vrij heeft. Dit vangt
+  // precies het scenario dat de aggregate check (computeDagCapaciteit) kan missen: de dag
+  // als geheel lijkt misschien prima bezet, maar als bijvoorbeeld alle 3 de mensen die friet
+  // kunnen doen die dag toevallig vrij vragen, is friet specifiek niet meer te bezetten.
+  function computeTaskCapaciteitPerDag(dayKey, dateIso, employeesList) {
+    const list = employeesList || employees;
+    const dayReqs = requirements[dayKey] || {};
+    const result = [];
+    TASKS.forEach((task) => {
+      const groups = getCellGroups(dayReqs, task.key);
+      if (!groups.length) return;
+      const benodigd = groups.reduce((sum, g) => sum + g.count, 0);
+      const capableScheduled = list.filter(
+        (e) => e.dagen[dayKey] && employeeCanDoTask(e, task.key) && !isTaakUitgeslotenOpDag(e, task.key, dayKey)
+      );
+      const vrijCount = capableScheduled.filter((e) => hasFullDayVerlof(e, dateIso)).length;
+      const beschikbaar = capableScheduled.length - vrijCount;
+      let status = "ok";
+      if (beschikbaar < benodigd) status = "vol";
+      else if (beschikbaar === benodigd) status = "krap";
+      result.push({ task: task.key, label: task.label, benodigd, beschikbaar, status });
+    });
+    return result;
+  }
+
+  // Toont alleen de taken die krap of niet meer haalbaar zijn (geen ruis voor taken die
+  // gewoon prima bezet blijven).
+  function taskCapaciteitBadgesHtml(perTaak) {
+    return perTaak
+      .filter((t) => t.status !== "ok")
+      .map(
+        (t) =>
+          `<span class="capaciteit-badge capaciteit-${t.status}" title="${t.beschikbaar} van de ${t.benodigd} benodigde mensen voor ${t.label} zijn nog inzetbaar.">${t.label}: ${
+            t.status === "vol" ? "NIET MOGELIJK" : "krap"
+          } (${t.beschikbaar}/${t.benodigd})</span>`
+      )
+      .join("");
+  }
+
   function capaciteitBadgeHtml(cap) {
     if (cap.status === "vol") {
       return `<span class="capaciteit-badge capaciteit-vol" title="Er zijn nog maar ${cap.beschikbaar} van de ${cap.benodigd} benodigde mensen inzetbaar. Extra verlof kan hier niet meer bij.">VOL — geen verlof meer mogelijk</span>`;
@@ -3623,16 +3726,21 @@ th { color: var(--muted); font-weight: 600; }
         .map((e) => `${e.naam} (${verlofEntryLabel(verlofEntryFor(e, day.dateIso))})`)
         .sort(),
       cap: computeDagCapaciteit(day),
+      perTaak: computeTaskCapaciteitPerDag(day.key, day.dateIso),
     }));
 
     emptyMsg.hidden = rows.some((r) => r.namen.length > 0);
 
     let html = "<thead><tr><th>Dag</th><th>Wie heeft vrij gevraagd</th><th>Capaciteit</th></tr></thead><tbody>";
-    rows.forEach(({ day, namen, cap }) => {
-      const rowClass = cap.status === "vol" ? "dag-vol" : cap.status === "krap" ? "dag-krap" : "";
+    rows.forEach(({ day, namen, cap, perTaak }) => {
+      // Een dag telt ook als "vol"/"krap" wanneer specifiek 1 taak (bijv. friet) niet meer
+      // te bezetten is, ook al lijkt de dag als geheel (aggregate) nog in orde.
+      const taakVol = perTaak.some((t) => t.status === "vol");
+      const taakKrap = perTaak.some((t) => t.status === "krap");
+      const rowClass = cap.status === "vol" || taakVol ? "dag-vol" : cap.status === "krap" || taakKrap ? "dag-krap" : "";
       html += `<tr class="${rowClass}"><td>${day.label}<br><small>${day.dateIso}</small></td><td>${
         namen.length ? namen.map((n) => `<span class="tag">${n}</span>`).join("") : "—"
-      }</td><td>${capaciteitBadgeHtml(cap)}</td></tr>`;
+      }</td><td>${capaciteitBadgeHtml(cap)}${taskCapaciteitBadgesHtml(perTaak)}</td></tr>`;
     });
     html += "</tbody>";
     table.innerHTML = html;
