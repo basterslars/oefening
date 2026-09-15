@@ -864,14 +864,14 @@ th { color: var(--muted); font-weight: 600; }
 
         <fieldset>
           <legend>Dienst aanvragen</legend>
-          <p class="fieldset-hint">Wil iemand juist graag een specifieke dienst werken (bijv. kassa op een bepaalde datum)? Zet dat hier neer — de generator geeft zo'n aanvraag voorrang boven de gewone eerlijke verdeling.</p>
+          <p class="fieldset-hint">Wil iemand juist graag op een bepaalde datum werken? Zet dat hier neer. Een specifieke taak kiezen is optioneel — laat "Taak" op "Geen specifieke taak" staan als iemand die dag gewoon graag wil werken, ongeacht welke taak. De generator geeft alleen voorrang voor de taak die je hier daadwerkelijk kiest; zonder gekozen taak krijgt niemand automatisch een taak toegewezen puur op basis van deze aanvraag.</p>
           <div class="verlof-input-row">
             <label class="verlof-inline-label">
               Datum
               <input type="date" id="employee-aanvraag-datum">
             </label>
             <label class="verlof-inline-label">
-              Taak
+              Taak (optioneel)
               <select id="employee-aanvraag-taak"></select>
             </label>
             <button type="button" id="add-aanvraag-btn" class="btn-secondary">+ Toevoegen</button>
@@ -1328,10 +1328,12 @@ th { color: var(--muted); font-weight: 600; }
       });
     }
     clean.takenUitzonderingen = takenUitzonderingen;
+    // taak is optioneel: null/leeg betekent "wil deze dag graag werken", zonder voorkeur
+    // voor een specifieke taak.
     clean.dienstAanvragen = Array.isArray(emp.dienstAanvragen)
       ? emp.dienstAanvragen
-          .map((a) => (a && a.datum ? { datum: a.datum, taak: migrateTaskKey(a.taak) } : null))
-          .filter((a) => a && TASKS.some((t) => t.key === a.taak))
+          .map((a) => (a && a.datum ? { datum: a.datum, taak: a.taak ? migrateTaskKey(a.taak) : null } : null))
+          .filter((a) => a && (a.taak === null || TASKS.some((t) => t.key === a.taak)))
       : [];
     clean.contract = {
       vast: !!contract.vast,
@@ -2396,7 +2398,15 @@ th { color: var(--muted); font-weight: 600; }
 
   let employeeFormAanvragen = [];
   const aanvraagTaakSelect = document.getElementById("employee-aanvraag-taak");
-  aanvraagTaakSelect.innerHTML = TASKS.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+  aanvraagTaakSelect.innerHTML =
+    '<option value="">— geen specifieke taak —</option>' +
+    TASKS.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+
+  // Zonder gekozen taak label je de aanvraag als "wil deze dag graag werken" i.p.v. een
+  // voorkeur voor 1 specifieke taak.
+  function aanvraagTaakLabel(taak) {
+    return taak ? taskLabel(taak) : "geen specifieke taak";
+  }
 
   function renderAanvraagList() {
     const ul = document.getElementById("employee-aanvraag-list");
@@ -2406,7 +2416,7 @@ th { color: var(--muted); font-weight: 600; }
       .sort((a, b) => a.datum.localeCompare(b.datum))
       .forEach((aanvraag) => {
         const li = document.createElement("li");
-        li.textContent = `${aanvraag.datum} — ${taskLabel(aanvraag.taak)} `;
+        li.textContent = `${aanvraag.datum} — ${aanvraagTaakLabel(aanvraag.taak)} `;
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
         removeBtn.textContent = "✕";
@@ -2424,11 +2434,12 @@ th { color: var(--muted); font-weight: 600; }
   document.getElementById("add-aanvraag-btn").addEventListener("click", () => {
     const datumInput = document.getElementById("employee-aanvraag-datum");
     if (!datumInput.value) return;
-    const taak = aanvraagTaakSelect.value;
+    const taak = aanvraagTaakSelect.value || null;
     const bestaatAl = employeeFormAanvragen.some((a) => a.datum === datumInput.value && a.taak === taak);
     if (!bestaatAl) employeeFormAanvragen.push({ datum: datumInput.value, taak });
     renderAanvraagList();
     datumInput.value = "";
+    aanvraagTaakSelect.value = "";
   });
 
   // ---------- Employee form submit / reset ----------
@@ -2615,7 +2626,7 @@ th { color: var(--muted); font-weight: 600; }
           emp.dienstAanvragen
             .slice()
             .sort((a, b) => a.datum.localeCompare(b.datum))
-            .map((a) => `<span class="tag tag-beschikbaar">${a.datum} — ${taskLabel(a.taak)}</span>`)
+            .map((a) => `<span class="tag tag-beschikbaar">${a.datum} — ${aanvraagTaakLabel(a.taak)}</span>`)
             .join("") || "—";
         tr.appendChild(tdAanvragen);
 
@@ -3300,7 +3311,7 @@ th { color: var(--muted); font-weight: 600; }
               html += `<option value="${emp.id}" ${selected}>${emp.naam}${suffix}</option>`;
             });
             html += `</select>`;
-            html += `<input type="text" class="tijdslot-badge" data-day="${day.key}" data-task="${group.scheduleKey}" data-idx="${i}" placeholder="tijd typen, bv. 16:00 - sluit">`;
+            html += `<select class="tijdslot-badge" data-day="${day.key}" data-task="${group.scheduleKey}" data-idx="${i}"></select>`;
           }
         });
         html += "</td>";
@@ -3310,12 +3321,12 @@ th { color: var(--muted); font-weight: 600; }
     html += "</tbody>";
     table.innerHTML = html;
 
-    table.querySelectorAll("select").forEach((select) => {
+    table.querySelectorAll("select:not(.tijdslot-badge)").forEach((select) => {
       applySelectWarningClass(select);
       select.addEventListener("change", onScheduleSelectChange);
     });
-    table.querySelectorAll("input.tijdslot-badge").forEach((input) => {
-      input.addEventListener("change", onTijdslotBadgeChange);
+    table.querySelectorAll("select.tijdslot-badge").forEach((select) => {
+      select.addEventListener("change", onTijdslotBadgeChange);
     });
     refreshTijdslotBadges();
   }
@@ -3361,7 +3372,6 @@ th { color: var(--muted); font-weight: 600; }
         });
       });
       const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday), taskByEmployeeIdFor(schedule[day.key]));
-      const { assignments } = mergeTijdslotOverrides(day.key, auto.assignments, auto.warnings, currentScheduleData);
       const dayOverrides = (currentScheduleData.tijdslotOverrides && currentScheduleData.tijdslotOverrides[day.key]) || {};
       document.querySelectorAll(`.tijdslot-badge[data-day="${day.key}"]`).forEach((badge) => {
         const task = badge.dataset.task;
@@ -3369,23 +3379,36 @@ th { color: var(--muted); font-weight: 600; }
         const id = (schedule[day.key][task] || [])[idx];
         badge.classList.remove("tijdslot-missing", "tijdslot-overridden");
         if (!id) {
-          badge.value = "";
+          badge.innerHTML = "";
           badge.disabled = true;
-          badge.placeholder = "";
           return;
         }
         badge.disabled = false;
-        if (dayOverrides[id]) {
-          badge.value = dayOverrides[id];
-          badge.classList.add("tijdslot-overridden");
-          return;
+        // De keuzemogelijkheden zijn exact dezelfde tijdopties die bij deze medewerker voor
+        // deze dag zijn aangevinkt, plus een "Automatisch"-optie om een eventuele
+        // handmatige overschrijving weer los te laten.
+        const emp = employees.find((e) => e.id === id);
+        const empOpts = emp ? employeeTijdslotOptions(emp, day.key, day.dateIso) : [];
+        const overrideVal = dayOverrides[id] || "";
+        const autoOpt = auto.assignments[id];
+        const autoLabel = autoOpt ? autoOpt.label : null;
+
+        let html = `<option value="">Automatisch${autoLabel ? ` (${autoLabel})` : " (geen tijdoptie)"}</option>`;
+        empOpts.forEach((opt) => {
+          html += `<option value="${opt.label}">${opt.label}</option>`;
+        });
+        // Een eerder handmatig ingevoerde tijd die niet (meer) bij de aangevinkte opties van
+        // deze medewerker hoort, blijft zichtbaar als losse optie zodat die niet stilzwijgend
+        // verdwijnt (bijv. na het wijzigen van iemands tijdsloten).
+        if (overrideVal && !empOpts.some((opt) => opt.label === overrideVal)) {
+          html += `<option value="${overrideVal}">${overrideVal} (handmatig)</option>`;
         }
-        const opt = assignments[id];
-        if (opt) {
-          badge.value = `${opt.start} - ${opt.eind === "sluit" ? "sluit" : opt.eind}`;
-        } else {
-          badge.value = "";
-          badge.placeholder = "geen tijdoptie — typ zelf een tijd";
+        badge.innerHTML = html;
+        badge.value = overrideVal;
+
+        if (overrideVal) {
+          badge.classList.add("tijdslot-overridden");
+        } else if (!autoLabel) {
           badge.classList.add("tijdslot-missing");
         }
       });
@@ -3767,9 +3790,13 @@ th { color: var(--muted); font-weight: 600; }
           let statusClass = "";
           if (scheduleData) {
             const daySchedule = scheduleData.schedule[day.key] || {};
-            const toegewezen = Object.keys(daySchedule).some(
-              (key) => baseTaskKey(key) === a.taak && (daySchedule[key] || []).includes(e.id)
-            );
+            // Zonder gekozen taak checken we alleen of iemand die dag ergens is ingedeeld
+            // (welke taak dan ook), in plaats van op 1 specifieke taak.
+            const toegewezen = a.taak
+              ? Object.keys(daySchedule).some(
+                  (key) => baseTaskKey(key) === a.taak && (daySchedule[key] || []).includes(e.id)
+                )
+              : Object.keys(daySchedule).some((key) => (daySchedule[key] || []).includes(e.id));
             status = toegewezen ? "✅ toegewezen" : "❌ niet toegewezen";
             statusClass = toegewezen ? "saldo-overschot" : "saldo-tekort";
           }
@@ -3784,7 +3811,7 @@ th { color: var(--muted); font-weight: 600; }
     rows
       .sort((a, b) => a.day.dateIso.localeCompare(b.day.dateIso) || a.naam.localeCompare(b.naam))
       .forEach((r) => {
-        html += `<tr><td>${r.day.label}<br><small>${r.day.dateIso}</small></td><td>${r.naam}</td><td>${taskLabel(
+        html += `<tr><td>${r.day.label}<br><small>${r.day.dateIso}</small></td><td>${r.naam}</td><td>${aanvraagTaakLabel(
           r.taak
         )}</td><td class="${r.statusClass}">${r.status}</td></tr>`;
       });
