@@ -455,6 +455,26 @@ th { color: var(--muted); font-weight: 600; }
 
 .empty-msg { color: var(--muted); font-size: 0.9rem; }
 
+.whatsapp-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  resize: vertical;
+}
+
+.copy-feedback {
+  color: var(--secondary-dark);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
 .tag {
   display: inline-block;
   background: var(--bg);
@@ -1034,6 +1054,16 @@ th { color: var(--muted); font-weight: 600; }
         <table id="schedule-table"></table>
       </div>
       <p id="schedule-empty-msg" class="empty-msg">Nog geen rooster gegenereerd voor deze week.</p>
+    </div>
+
+    <div class="panel" id="whatsapp-rooster-panel" hidden>
+      <h2>Rooster kopiëren (bijv. voor WhatsApp)</h2>
+      <p class="fieldset-hint">Een kopieerbare tekstversie van het rooster hierboven, in hetzelfde stramien als hoe het rooster nu wordt doorgestuurd: per dag de datum, daaronder iedereen die die dag werkt met zijn/haar tijd. Werkt automatisch mee met wijzigingen die je hierboven maakt.</p>
+      <textarea id="whatsapp-rooster-text" class="whatsapp-textarea" readonly rows="16"></textarea>
+      <div class="form-actions">
+        <button type="button" id="copy-whatsapp-btn" class="btn-secondary">📋 Kopieer rooster-tekst</button>
+        <span id="copy-whatsapp-feedback" class="copy-feedback" hidden>Gekopieerd!</span>
+      </div>
     </div>
   </section>
 
@@ -3426,6 +3456,7 @@ th { color: var(--muted); font-weight: 600; }
     refreshTijdslotBadges();
     renderWarnings(computeWarningsFromCurrent());
     renderContractProgress();
+    renderWhatsappRooster();
   }
 
   // Slaat een handmatig getypte tijd op als overschrijving van de automatisch berekende
@@ -3447,6 +3478,7 @@ th { color: var(--muted); font-weight: 600; }
     refreshTijdslotBadges();
     renderWarnings(computeWarningsFromCurrent());
     renderContractProgress();
+    renderWhatsappRooster();
   }
 
   function updateUnderstaffedHighlight() {
@@ -3606,6 +3638,95 @@ th { color: var(--muted); font-weight: 600; }
       });
   }
 
+  const WHATSAPP_MONTH_NAMES = [
+    "januari", "februari", "maart", "april", "mei", "juni",
+    "juli", "augustus", "september", "oktober", "november", "december",
+  ];
+  // Compacte tijdnotatie voor de kopieerbare tekst (punt i.p.v. dubbele punt, geen spaties
+  // rond het streepje, "sluit" blijft "sluit"), naast — niet in plaats van — de normale
+  // roostertabel hierboven.
+  function formatTijdCompact(tijd) {
+    return tijd === "sluit" ? "sluit" : tijd.replace(":", ".");
+  }
+
+  // Bouwt, uit precies dezelfde (automatische + eventueel handmatig overschreven) tijdslot-
+  // toewijzingen als de roostertabel, een plat-tekst versie: per dag de datum, daaronder
+  // iedereen die dag met naam + tijd, in dezelfde volgorde als de taken in de roostertabel.
+  function buildWhatsappRoosterText() {
+    if (!currentScheduleData || !currentWeekDates) return "";
+    const { schedule } = currentScheduleData;
+    const lines = [];
+    currentWeekDates.forEach((day) => {
+      const dateObj = new Date(day.dateIso + "T00:00:00Z");
+      lines.push(`${day.label} ${dateObj.getUTCDate()} ${WHATSAPP_MONTH_NAMES[dateObj.getUTCMonth()]}`);
+
+      const daySchedule = schedule[day.key] || {};
+      const idsToday = new Set();
+      const orderedIds = [];
+      TASKS.forEach((task) => {
+        Object.keys(daySchedule).forEach((key) => {
+          if (baseTaskKey(key) !== task.key) return;
+          (daySchedule[key] || []).forEach((id) => {
+            if (id && !idsToday.has(id)) {
+              idsToday.add(id);
+              orderedIds.push(id);
+            }
+          });
+        });
+      });
+
+      const auto = assignTijdslotenForDay(day.key, day.dateIso, Array.from(idsToday), taskByEmployeeIdFor(daySchedule));
+      const { assignments } = mergeTijdslotOverrides(day.key, auto.assignments, auto.warnings, currentScheduleData);
+
+      if (!orderedIds.length) {
+        lines.push("— niemand ingedeeld —");
+      } else {
+        orderedIds.forEach((id) => {
+          const emp = employees.find((e) => e.id === id);
+          if (!emp) return;
+          const opt = assignments[id];
+          const tijdText = opt ? `${formatTijdCompact(opt.start)}-${formatTijdCompact(opt.eind)}` : "geen tijd ingesteld";
+          lines.push(`${emp.naam} ${tijdText}`);
+        });
+      }
+      lines.push("");
+    });
+    return lines.join("\n").trim();
+  }
+
+  function renderWhatsappRooster() {
+    const panel = document.getElementById("whatsapp-rooster-panel");
+    const textarea = document.getElementById("whatsapp-rooster-text");
+    if (!currentScheduleData || !currentWeekDates) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+    textarea.value = buildWhatsappRoosterText();
+  }
+
+  document.getElementById("copy-whatsapp-btn").addEventListener("click", async () => {
+    const textarea = document.getElementById("whatsapp-rooster-text");
+    const feedback = document.getElementById("copy-whatsapp-feedback");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(textarea.value);
+      } else {
+        textarea.select();
+        document.execCommand("copy");
+      }
+      feedback.textContent = "Gekopieerd!";
+    } catch (err) {
+      textarea.select();
+      feedback.textContent = "Kopiëren via de knop is mislukt — tekst is wel geselecteerd, kopieer met Ctrl+C.";
+    }
+    feedback.hidden = false;
+    clearTimeout(renderWhatsappRooster._feedbackTimer);
+    renderWhatsappRooster._feedbackTimer = setTimeout(() => {
+      feedback.hidden = true;
+    }, 2500);
+  });
+
   function renderWarnings(warnings) {
     const box = document.getElementById("warnings-box");
     if (!warnings.length) {
@@ -3631,6 +3752,7 @@ th { color: var(--muted); font-weight: 600; }
     renderScheduleTable();
     renderWarnings(computeWarningsFromCurrent());
     renderContractProgress();
+    renderWhatsappRooster();
   });
 
   // Load a previously saved schedule for the currently selected week, if any.
@@ -3645,6 +3767,7 @@ th { color: var(--muted); font-weight: 600; }
       renderScheduleTable();
       renderWarnings(computeWarningsFromCurrent());
       renderContractProgress();
+      renderWhatsappRooster();
     } else {
       currentWeekValue = weekValue;
       currentWeekDates = computeWeekDates(weekValue);
@@ -3652,6 +3775,7 @@ th { color: var(--muted); font-weight: 600; }
       renderScheduleTable();
       renderWarnings([]);
       renderContractProgress();
+      renderWhatsappRooster();
     }
   }
 
