@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+}
+
+:root {
+  --bg: #f7f7f5;
+  --panel: #ffffff;
+  --line: #e6e5e1;
+  --ink: #18181b;
+  --muted: #6b6b70;
+  --accent: #4f46e5;
+  --accent-soft: #eef0ff;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f11;
+    --panel: #18181b;
+    --line: #2a2a2f;
+    --ink: #f1f1f3;
+    --muted: #9b9ba3;
+    --accent: #8b8cf8;
+    --accent-soft: #23234a;
+    color-scheme: dark;
+  }
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.prose-plan h2 { font-weight: 600; font-size: 1rem; margin: 1.25rem 0 0.5rem; }
+.prose-plan h3 { font-weight: 600; margin: 1rem 0 0.4rem; }
+.prose-plan p { margin: 0.5rem 0; line-height: 1.6; }
+.prose-plan ul, .prose-plan ol { margin: 0.5rem 0 0.5rem 1.25rem; line-height: 1.6; }
+.prose-plan ul { list-style: disc; }
+.prose-plan ol { list-style: decimal; }

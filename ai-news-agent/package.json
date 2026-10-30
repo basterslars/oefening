@@ -1,0 +1,37 @@
+{
+  "name": "ai-news-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test --test-reporter=spec \"tests/**/*.test.ts\"",
+    "digest": "node --env-file-if-exists=.env.local --import tsx scripts/generate.ts",
+    "digest:force": "node --env-file-if-exists=.env.local --import tsx scripts/generate.ts --force"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.134.0",
+    "fast-xml-parser": "5.11.2",
+    "lucide-react": "1.57.0",
+    "next": "16.4.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "server-only": "0.0.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}
